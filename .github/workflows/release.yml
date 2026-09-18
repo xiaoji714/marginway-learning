@@ -1,0 +1,47 @@
+name: Draft release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version already merged to main, e.g. 0.2.0"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+  draft:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: pnpm run version:check "v$RELEASE_VERSION"
+      - uses: actions/download-artifact@v4
+        with:
+          name: marginway-learning-ubuntu-latest
+          path: release-artifacts
+      - name: Create draft with verified artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          existing=$(git ls-remote --tags origin "refs/tags/v${RELEASE_VERSION}")
+          test -z "$existing" || { echo "Tag already exists; refusing to reuse it"; exit 1; }
+          cd release-artifacts
+          sha256sum -c "marginway-learning-${RELEASE_VERSION}.zip.sha256"
+          gh release create "v$RELEASE_VERSION" "marginway-learning-${RELEASE_VERSION}.zip" "marginway-learning-${RELEASE_VERSION}.zip.sha256" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --title "Marginway $RELEASE_VERSION" --generate-notes

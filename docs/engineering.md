@@ -5,7 +5,7 @@
 - `apps/extension`：MV3 浏览器入口、页面交互与服务适配器。
 - `apps/cli`：Agent 与用户的 JSON CLI。
 - `apps/native-host`：Chrome Native Messaging 进程，按安装 ID 校验来源。
-- `packages/learning/core`：SQLite、版本化记录、任务、复习与上下文导出。
+- `packages/learning/core`：`domains/` 按资源、笔记、词汇复习、讨论、任务、备份划分；`repository.ts` 封装存储，`store.ts` 维护查询、事务和幂等分发，`capabilities.ts` 负责能力发现。
 - `scripts`：构建、发布、安装、门禁。
 - `skills`：Agent 使用说明。
 
@@ -29,8 +29,8 @@ TypeScript 源码、pnpm workspace、Node 22.23.2、Vitest + V8、tsc、esbuild�
 
 仅 stage 白名单运行产物；新 checkout 从 lockfile 安装后可构建。不包含 API Key、个人截图、数据库、机器路径、固定扩展 ID。安装目录与 ID 由用户明确提供，桥接与 CLI 被复制到稳定 runtime，不依赖源码目录继续存在。
 
-macOS 具有自动安装烟测；Linux/Windows 支持安装路径分支但未完成对应系统实机验收。不把配置脚本通过当成跨平台验收。
+GitHub-hosted Linux/macOS/Windows 执行隔离安装烟测。Windows 烟测跳过真实注册表写入；自动化脚本通过不等于 Chrome UI 和桥接注册的跨平台实机验收。版本与草稿发布见 releases.md。
 
 ## 决策与协作
 
-非平凡变更在 `.agents/notes/implemented/` 说明为什么、放弃什么、怎么验证。任务状态未来放 GitHub Issue/Project，不用本地进度文件替代。PR 进入 main，分支/worktree 隔离并行任务，不直接改上游参考项目。
+非平凡变更在 `.agents/notes/implemented/` 说明为什么、放弃什么、怎么验证。任务状态放 GitHub Issue/Project，不用本地进度文件替代。PR 进入 main，分支/worktree 隔离并行任务，不直接改上游参考项目。
