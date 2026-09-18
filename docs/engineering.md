@@ -33,4 +33,4 @@ GitHub-hosted Linux/macOS/Windows 执行隔离安装烟测。Windows 烟测跳�
 
 ## 决策与协作
 
-非平凡变更在 `.agents/notes/implemented/` 说明为什么、放弃什么、怎么验证。任务状态放 GitHub Issue/Project，不用本地进度文件替代。PR 进入 main，分支/worktree 隔离并行任务，不直接改上游参考项目。
+协作、Issue 状态与 PR 门禁见 [开发流程](development-process.md)；文档与决策记录按各自职责维护。
