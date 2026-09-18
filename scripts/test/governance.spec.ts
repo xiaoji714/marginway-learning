@@ -75,6 +75,9 @@ test("real closed state wins over labels; reopening terminal returns to inbox", 
 test("Note lifecycle matches path and required sections have content", () => {
   expect(() => validateNote(note, content)).not.toThrow();
   expect(() =>
+    validateNote(note, content.replaceAll("\n", "\r\n")),
+  ).not.toThrow();
+  expect(() =>
     validateNote(note.replace("implemented", "proposed"), content),
   ).toThrow();
   expect(() =>
@@ -109,4 +112,21 @@ test("new, oversized and stale document budgets fail independently", (t) => {
   rmSync(join(root, "new.md"));
   write("scripts/doc-budgets.json", '{"README.md":1,"gone.md":12}');
   expect(() => verifyDocs(root)).toThrow(/Stale/);
+});
+
+test("package guard rejects missing test entry and undiscoverable cases", async (t) => {
+  const { verifyPackageTests } = await import("../verify-package-tests.js");
+  const root = mkdtempSync(join(tmpdir(), "marginway-package-policy-"));
+  t.onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+  const pkg = join(root, "apps", "example");
+  mkdirSync(join(pkg, "tests"), { recursive: true });
+  writeFileSync(join(pkg, "package.json"), '{"name":"example"}');
+  expect(() => verifyPackageTests([root, pkg], root)).toThrow(/test entry/);
+  writeFileSync(
+    join(pkg, "package.json"),
+    '{"name":"example","scripts":{"test":"vitest run"}}',
+  );
+  expect(() => verifyPackageTests([root, pkg], root)).toThrow(/discoverable/);
+  writeFileSync(join(pkg, "tests", "entry.spec.ts"), "// fixture");
+  expect(() => verifyPackageTests([root, pkg], root)).not.toThrow();
 });

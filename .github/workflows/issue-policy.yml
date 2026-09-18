@@ -16,6 +16,9 @@ on:
       pr:
         description: PR number to validate (manual result is not a PR check)
         required: true
+concurrency:
+  group: issue-policy-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
 permissions:
   contents: read
   issues: read

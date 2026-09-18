@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 export function validateNote(path: string, text: string): void {
+  text = text.replaceAll("\r\n", "\n");
   const lifecycle = path.split("/")[2];
   if (
     !["proposed", "implemented", "rejected", "archived"].includes(
@@ -40,7 +41,10 @@ export function verifyDocs(root = process.cwd()): void {
   };
   walk(root);
   for (const file of files) {
-    const text = readFileSync(join(root, file), "utf8");
+    const text = readFileSync(join(root, file), "utf8").replaceAll(
+      "\r\n",
+      "\n",
+    );
     if (file.startsWith(".agents/notes/") && file !== ".agents/notes/README.md")
       validateNote(file, text);
     else {
