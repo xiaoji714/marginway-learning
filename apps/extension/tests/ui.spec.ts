@@ -664,3 +664,108 @@ test("card freezes selected word and context; only the thought is editable", asy
   assert.equal(writes.filter((m) => m.command === "jobs.submit").length, 1);
   note.dispose();
 });
+
+test("selection card expresses saved state on the button and removes duplicate context metadata", async (t) => {
+  const dom = new JSDOM("<body></body>", {
+    url: "https://example.com",
+    runScripts: "outside-only",
+  });
+  const w = dom.window;
+  t.onTestFinished(() => w.close());
+  let saved = false,
+    failSave = true,
+    saves = 0;
+  w.chrome = {
+    runtime: {
+      sendMessage: async (m) => {
+        if (m.command === "vocabulary.save") {
+          saves++;
+          assert.equal(m.params.anchorId, "anchor");
+          assert.equal(m.params.word, "penalty");
+          if (failSave) return { ok: false, error: "保存失败，请重试" };
+          saved = true;
+        }
+        return {
+          ok: true,
+          result:
+            m.command === "occurrences.list"
+              ? {
+                  items: saved ? [{ anchorId: "anchor", word: "penalty" }] : [],
+                  next: null,
+                }
+              : m.command === "jobs.submit"
+                ? { id: "job" }
+                : m.command === "jobs.get"
+                  ? {
+                      status: "done",
+                      result: "代价、性能损失\n译文：重复的整句翻译",
+                    }
+                  : {},
+        };
+      },
+    },
+  };
+  w.eval(script("common"));
+  const args = {
+    container: w.document.body,
+    resource: {
+      id: "resource",
+      title: "Do not repeat this video title",
+      url: "https://www.youtube.com/watch?v=abcdefghijk",
+    },
+    anchor: { id: "anchor", quote: "A parallelization penalty.", start: 189 },
+    selected: "penalty",
+    translation: "并行化的代价。",
+  };
+  let card = w.LC.discussionCard(args);
+  await pause(20);
+  assert.equal(
+    card.querySelector(".lc-definition").textContent,
+    "代价、性能损失",
+  );
+  assert.equal(card.textContent.includes("重复的整句翻译"), false);
+  assert.equal(card.textContent.includes(args.resource.title), false);
+  assert.equal(
+    card.querySelector(".lc-translation").textContent,
+    args.translation,
+  );
+  assert.equal(card.querySelector(".lc-context-head a").textContent, "3:09");
+  assert.match(card.querySelector(".lc-context-head a").href, /t=189/);
+  const collect = card.querySelector(".lc-word-actions button");
+  collect.click();
+  await pause(10);
+  assert.equal(collect.disabled, false);
+  assert.equal(collect.textContent, "收藏单词");
+  assert.equal(
+    card.querySelector(".lc-status").textContent,
+    "保存失败，请重试",
+  );
+  failSave = false;
+  collect.click();
+  await pause(10);
+  assert.equal(collect.textContent, "✓已收藏");
+  assert.equal(collect.disabled, true);
+  assert.equal(card.querySelector(".lc-status").textContent, "");
+  collect.click();
+  await pause(10);
+  assert.equal(saves, 2);
+  card.dispose();
+  card = w.LC.discussionCard(args);
+  await pause(20);
+  assert.equal(
+    card.querySelector(".lc-word-actions button").textContent,
+    "✓已收藏",
+  );
+  card.dispose();
+  card = w.LC.discussionCard({
+    ...args,
+    anchor: { id: "other", quote: "A different penalty." },
+  });
+  await pause(20);
+  assert.equal(
+    card.querySelector(".lc-word-actions button").textContent,
+    "收藏单词",
+  );
+  assert.equal(card.querySelector(".lc-source"), null);
+  card.dispose();
+});
