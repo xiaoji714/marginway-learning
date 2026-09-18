@@ -31,3 +31,12 @@ jobs:
         with:
           name: marginway-learning-${{ matrix.os }}
           path: dist/*.zip*
+  pr-gate:
+    if: always()
+    needs: [verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all platforms
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: test "$VERIFY_RESULT" = success
