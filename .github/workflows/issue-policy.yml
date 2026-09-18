@@ -1,0 +1,42 @@
+name: Issue policy
+on:
+  pull_request:
+    types:
+      [
+        opened,
+        edited,
+        synchronize,
+        reopened,
+        labeled,
+        unlabeled,
+        ready_for_review,
+      ]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to validate (manual result is not a PR check)
+        required: true
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+jobs:
+  policy:
+    name: Issue policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsx scripts/governance.ts pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr }}
