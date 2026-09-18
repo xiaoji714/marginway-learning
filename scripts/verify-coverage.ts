@@ -11,7 +11,7 @@ const walk = (d: string): string[] =>
   );
 for (const file of walk("packages").filter(
   (x) =>
-    x.includes("/src/") &&
+    x.replaceAll("\\", "/").includes("/src/") &&
     x.endsWith(".ts") &&
     !x.endsWith(".d.ts") &&
     !x.includes("node_modules"),

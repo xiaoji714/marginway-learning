@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdtempSync,
   readFileSync,
   mkdirSync,
@@ -10,9 +11,13 @@ import { join, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { unzipSync, strFromU8 } from "fflate";
 import assert from "node:assert/strict";
+import { checkVersions } from "./version.js";
+const version = checkVersions();
 const temp = mkdtempSync(join(tmpdir(), "context-release-"));
 try {
-  const entries = unzipSync(readFileSync("dist/marginway-learning-0.2.0.zip"));
+  const entries = unzipSync(
+    readFileSync(`dist/marginway-learning-${version}.zip`),
+  );
   for (const [file, content] of Object.entries(entries)) {
     assert(!/(?:node_modules|\/src\/|\.sqlite|\.env)/.test(file), file);
     assert(!file.split("/").includes(".."));
@@ -27,10 +32,34 @@ try {
   }
   const home = join(temp, "home"),
     dir = join(temp, "chosen-extension");
+  const foreign = join(temp, "unrelated-folder");
+  mkdirSync(foreign);
+  writeFileSync(join(foreign, "keep.txt"), "unrelated data");
+  const rejected = spawnSync(
+    process.execPath,
+    [
+      join(temp, "media/runtime/install.js"),
+      "--skip-registration",
+      "--home",
+      home,
+      "--extension-id",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "--extension-dir",
+      foreign,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(rejected.status, 0);
+  assert.equal(
+    readFileSync(join(foreign, "keep.txt"), "utf8"),
+    "unrelated data",
+  );
+  assert(!existsSync(join(home, ".local/share/learning-companion/runtime")));
   const installed = spawnSync(
     process.execPath,
     [
       join(temp, "media/runtime/install.js"),
+      "--skip-registration",
       "--home",
       home,
       "--extension-id",
@@ -52,17 +81,38 @@ try {
     return JSON.parse(p.stdout).result;
   };
   // Prove the installed CLI does not depend on the extracted media or source checkout.
-  rmSync(join(temp, "media"), { recursive: true });
+
   assert(run("capabilities").commands["notes.append"]);
   const r = run(
     "resources.upsert",
     "--json",
     JSON.stringify({ url: "https://example.com/release" }),
   );
+  writeFileSync(join(dir, "obsolete.js"), "old output");
+  const upgraded = spawnSync(
+    process.execPath,
+    [
+      join(temp, "media/runtime/install.js"),
+      "--skip-registration",
+      "--home",
+      home,
+      "--extension-id",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "--extension-dir",
+      dir,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(upgraded.status, 0, upgraded.stderr);
+  assert(!existsSync(join(dir, "obsolete.js")));
+  rmSync(join(temp, "media"), { recursive: true });
   assert.equal(run("resources.list").items[0].id, r.id);
+  const info = JSON.parse(strFromU8(entries["build-info.json"]!));
+  assert.equal(info.version, version);
+  assert.match(info.commit, /^[a-f0-9]{40}$/);
   assert.equal(
     JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")).version,
-    "0.2.0",
+    version,
   );
   console.log(
     "Release extraction, configurable installation and independent CLI persistence passed.",

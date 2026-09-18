@@ -30,9 +30,6 @@ const media = existsSync(join(import.meta.dirname, "native-host.js"))
   : resolve(import.meta.dirname, "../dist/marginway-learning");
 if (!existsSync(join(media, "runtime/native-host.js")))
   throw new Error("Build the release first: pnpm run package");
-const runtime = join(home, ".local/share/learning-companion/runtime");
-mkdirSync(runtime, { recursive: true, mode: 0o700 });
-cpSync(join(media, "runtime"), runtime, { recursive: true });
 const target = resolve(destination);
 if (target !== join(media, "extension")) {
   if (existsSync(target) && readdirSync(target).length) {
@@ -62,6 +59,9 @@ if (target !== join(media, "extension")) {
   mkdirSync(target, { recursive: true });
   cpSync(join(media, "extension"), target, { recursive: true });
 }
+const runtime = join(home, ".local/share/learning-companion/runtime");
+mkdirSync(runtime, { recursive: true, mode: 0o700 });
+cpSync(join(media, "runtime"), runtime, { recursive: true });
 const quote = (s: string) => "'" + s.replaceAll("'", "'\\''") + "'";
 const bin = join(home, ".local/bin");
 mkdirSync(bin, { recursive: true });
@@ -115,7 +115,7 @@ writeFileSync(
     2,
   ),
 );
-if (win) {
+if (win && !args.includes("--skip-registration")) {
   const p = spawnSync(
     "reg",
     [
