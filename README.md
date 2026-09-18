@@ -24,7 +24,7 @@ pnpm install --frozen-lockfile
 pnpm run ci
 ```
 
-1. 解压 `dist/marginway-learning-0.2.0.zip` 到你选择的长期保留目录。
+1. 解压 `dist/marginway-learning-<版本>.zip` 到你选择的长期保留目录。
 2. 打开 `chrome://extensions`，开启开发者模式，点「加载已解压的扩展程序」，选择刚才的 **extension** 文件夹。
 3. 复制 Chrome 显示的扩展 ID，再运行解压包内的安装器：
 
@@ -55,8 +55,12 @@ CLI 与浏览器访问同一个 SQLite 数据库。`--actor`、`--model` 是客�
 
 ## 开发
 
+版本与发布流程见 [版本与发布](docs/releases.md)。CI 使用 GitHub-hosted Linux、macOS、Windows runner；创建 Release 草稿需手动触发，不自动正式发布。
+
 | 命令 | 用途 |
 |---|---|
+| `pnpm run version:check` | 检查根版本、各包与 Chrome manifest 一致 |
+| `pnpm run version:set X.Y.Z` | 同步升版；在分支提交 PR |
 | `pnpm run build` | tsc 编译核心/CLI/桥接，esbuild 编译 MV3 浏览器入口 |
 | `pnpm run typecheck` | 全包严格类型检查 |
 | `pnpm test` | Vitest 聚合测试 |

@@ -10,6 +10,9 @@ import {
 import { resolve, relative, join } from "node:path";
 import { zipSync } from "fflate";
 import { createHash } from "node:crypto";
+import { checkVersions } from "./version.js";
+import { execFileSync } from "node:child_process";
+const version = checkVersions();
 const root = resolve(import.meta.dirname, "..");
 const stage = join(root, "dist/marginway-learning");
 rmSync(stage, { recursive: true, force: true });
@@ -38,9 +41,33 @@ for (const f of [
   "PRIVACY.md",
   "SECURITY.md",
   "THIRD_PARTY_NOTICES.md",
+  "CHANGELOG.md",
 ])
   cpSync(join(root, f), join(stage, f));
 cpSync(join(root, "skills"), join(stage, "skills"), { recursive: true });
+writeFileSync(
+  join(stage, "build-info.json"),
+  JSON.stringify(
+    {
+      version,
+      commit: execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: root,
+        encoding: "utf8",
+      }).trim(),
+      dirty: Boolean(
+        execFileSync("git", ["status", "--porcelain"], {
+          cwd: root,
+          encoding: "utf8",
+        }).trim(),
+      ),
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+    },
+    null,
+    2,
+  ) + "\n",
+);
 const files: Record<string, Uint8Array> = {};
 function walk(dir: string) {
   for (const f of readdirSync(dir, { withFileTypes: true })) {
@@ -57,11 +84,11 @@ const archive = zipSync(files, {
   level: 9,
   mtime: new Date("2026-01-01T00:00:00Z"),
 });
-const out = join(root, "dist/marginway-learning-0.2.0.zip");
+const out = join(root, `dist/marginway-learning-${version}.zip`);
 writeFileSync(out, archive);
 writeFileSync(
   out + ".sha256",
   createHash("sha256").update(archive).digest("hex") +
-    "  marginway-learning-0.2.0.zip\n",
+    `  marginway-learning-${version}.zip\n`,
 );
 console.log(out);
