@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Marginway · 语境 · 学习资料库</title
+  ><link rel="stylesheet" href="app.css" />
+  <body class="library">
+    <header>
+      <div class="brandbar">
+        <a class="brand" href="library.html"
+          ><img
+            src="icons/book-open.svg"
+            alt=""
+            width="30"
+            height="30"
+          /><strong>语境</strong><span>Marginway</span></a
+        >
+        <div class="toolbar">
+          <button id="export">备份导出</button
+          ><button id="settings">设置</button>
+        </div>
+      </div>
+      <div class="library-intro">
+        <div>
+          <h1>学习资料库</h1>
+          <p class="muted">从原文出发，让单词与思考有迹可循。</p>
+        </div>
+        <div class="searchbar">
+          <input
+            aria-label="搜索学习资料"
+            id="query"
+            placeholder="搜索原文、词汇、笔记或分类…"
+          /><button id="search" class="primary">搜索</button>
+        </div>
+      </div>
+    </header>
+    <main>
+      <nav class="nav" aria-label="资料库分类">
+        <span class="nav-label">我的学习</span
+        ><button data-view="resources.list">全部资源</button
+        ><button data-view="vocabulary.list">单词簿</button
+        ><button data-view="notes.list">思考笔记</button
+        ><button data-view="review">今日复习</button
+        ><span class="nav-label">概览</span
+        ><button data-view="jobs.list">任务状态</button
+        ><button data-view="stats">学习统计</button>
+      </nav>
+      <section class="workspace">
+        <div class="view-heading">
+          <div>
+            <h2 id="view-title">全部资源</h2>
+            <p id="view-description" class="muted"></p>
+          </div>
+          <div
+            id="status"
+            class="status"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </div>
+        <section id="content" aria-label="学习记录"></section>
+      </section>
+    </main>
+    <script src="common.js"></script>
+    <script src="library.js"></script>
+  </body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Marginway · 语境 · 双语学习</title
+  ><link rel="stylesheet" href="app.css" />
+  <body class="study-panel">
+    <header>
+      <div class="brandbar">
+        <div class="brand">
+          <img src="icons/book-open.svg" alt="" width="26" height="26" /><strong
+            >语境</strong
+          ><span>Marginway</span>
+        </div>
+        <div class="toolbar">
+          <button id="library">资料库</button><button id="options">设置</button>
+        </div>
+      </div>
+      <div id="title" class="resource-title">正在连接当前资源…</div>
+      <button id="load" class="primary" hidden>启用当前网页</button>
+      <div class="playback-bar">
+        <span class="section-label">双语字幕</span
+        ><button id="follow" aria-pressed="true">跟随播放</button>
+      </div>
+      <div id="status" class="status" role="status"></div>
+      <progress
+        id="translation-progress"
+        max="1"
+        value="0"
+        aria-label="全文翻译进度"
+        hidden
+      ></progress>
+    </header>
+    <main id="timeline"></main>
+    <script src="common.js"></script>
+    <script src="panel.js"></script>
+  </body>
+</html>

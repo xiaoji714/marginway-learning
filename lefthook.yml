@@ -1,0 +1,11 @@
+pre-commit:
+  jobs:
+    - name: whitespace
+      run: git diff --cached --check
+    - name: agent notes
+      glob: '.agents/notes/**'
+      run: pnpm run doc-sync
+pre-push:
+  jobs:
+    - name: typecheck
+      run: pnpm run typecheck

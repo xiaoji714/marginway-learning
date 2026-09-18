@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Marginway · 语境 · 设置</title>
+    <link rel="stylesheet" href="app.css" />
+    <style>
+      main {
+        max-width: 640px;
+        margin: 48px auto;
+        padding: 24px;
+      }
+      label {
+        display: block;
+        margin: 24px 0;
+      }
+      input {
+        display: block;
+        width: 100%;
+        margin-top: 8px;
+      }
+      h1 {
+        font-size: 28px;
+      }
+      .help {
+        font-size: 14px;
+        color: #637870;
+        line-height: 1.7;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="library.html">Marginway · 语境 · 学习资料库</a>
+      <h1>连接学习服务</h1>
+      <p class="help">
+        密钥仅保存在当前浏览器个人资料中。字幕请求发送给
+        Supadata；翻译请求发送给 DeepSeek。笔记与单词保存在本机 SQLite 资料库。
+      </p>
+      <form id="settings">
+        <label
+          >Supadata API Key<input
+            id="supadataApiKey"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+        /></label>
+        <p class="help">
+          获取 YouTube 原生字幕。<a
+            href="https://dash.supadata.ai"
+            target="_blank"
+            rel="noreferrer"
+            >管理 Supadata 密钥</a
+          >
+        </p>
+        <label
+          >DeepSeek API Key<input
+            id="aiApiKey"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+        /></label>
+        <p class="help">
+          当前模型：DeepSeek V4 Flash。<a
+            href="https://platform.deepseek.com/api_keys"
+            target="_blank"
+            rel="noreferrer"
+            >管理 DeepSeek 密钥</a
+          >
+        </p>
+        <button class="primary" type="submit">保存设置</button>
+        <p id="status" role="status" aria-live="polite"></p>
+      </form>
+      <hr />
+      <h2>本机服务</h2>
+      <p class="help">安装本机桥接时需要此扩展 ID：</p>
+      <code id="extensionId"></code>
+      <p class="help">
+        资源、笔记与复习数据通过资料库页面导出；修改密钥不会清除学习记录。
+      </p>
+    </main>
+    <script src="settings.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "@context/core",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --root ../../.. packages/learning/core/tests"
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./lib/store.d.ts",
+      "default": "./lib/store.js"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib",
+    "noEmit": true,
+    "declaration": true,
+    "sourceMap": true,
+    "types": ["chrome"],
+    "moduleDetection": "force"
+  },
+  "include": ["src"]
+}
