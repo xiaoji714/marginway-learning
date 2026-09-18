@@ -9,19 +9,23 @@
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "build": "pnpm -r build",
-    "typecheck": "pnpm run build && pnpm -r typecheck && tsc --noEmit",
+    "typecheck": "pnpm run build && pnpm run typecheck:built",
     "test": "pnpm run build && vitest run",
-    "test:coverage": "pnpm run build && vitest run --coverage && tsx scripts/verify-coverage.ts",
+    "test:coverage": "pnpm run build && pnpm run coverage:built",
     "check": "tsx scripts/check.ts",
     "doc-sync": "tsx scripts/doc-sync.ts",
-    "package": "pnpm run build && tsx scripts/package.ts",
+    "package": "pnpm run build && pnpm run package:built",
     "install:local": "tsx scripts/install.ts",
-    "ci": "pnpm run version:check && pnpm run typecheck && pnpm run test:coverage && pnpm run test:skills && pnpm run check && pnpm run doc-sync && pnpm run package && pnpm run test:release",
+    "ci": "pnpm run version:check && pnpm run build && pnpm run typecheck:built && pnpm run coverage:built && pnpm run check && pnpm run test:packages && pnpm run doc-sync && pnpm run package:built && pnpm run test:release",
     "postinstall": "tsx scripts/install-hooks.ts",
     "test:skills": "vitest run scripts/test/skill.spec.ts",
     "test:release": "tsx scripts/smoke-release.ts",
     "version:check": "tsx scripts/version.ts check",
-    "version:set": "tsx scripts/version.ts set"
+    "version:set": "tsx scripts/version.ts set",
+    "typecheck:built": "pnpm -r typecheck && tsc --noEmit",
+    "coverage:built": "vitest run --coverage && tsx scripts/verify-coverage.ts",
+    "package:built": "tsx scripts/package.ts",
+    "test:packages": "tsx scripts/verify-package-tests.ts"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
