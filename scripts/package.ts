@@ -45,6 +45,7 @@ for (const f of [
 ])
   cpSync(join(root, f), join(stage, f));
 cpSync(join(root, "skills"), join(stage, "skills"), { recursive: true });
+cpSync(join(root, "docs"), join(stage, "docs"), { recursive: true });
 writeFileSync(
   join(stage, "build-info.json"),
   JSON.stringify(

@@ -32,6 +32,29 @@ try {
   }
   const home = join(temp, "home"),
     dir = join(temp, "chosen-extension");
+  const foreign = join(temp, "unrelated-folder");
+  mkdirSync(foreign);
+  writeFileSync(join(foreign, "keep.txt"), "unrelated data");
+  const rejected = spawnSync(
+    process.execPath,
+    [
+      join(temp, "media/runtime/install.js"),
+      "--skip-registration",
+      "--home",
+      home,
+      "--extension-id",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "--extension-dir",
+      foreign,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(rejected.status, 0);
+  assert.equal(
+    readFileSync(join(foreign, "keep.txt"), "utf8"),
+    "unrelated data",
+  );
+  assert(!existsSync(join(home, ".local/share/learning-companion/runtime")));
   const installed = spawnSync(
     process.execPath,
     [
