@@ -1158,3 +1158,153 @@ test("library edits resources, words, context meanings and notes through the sto
   assert.equal(w.document.querySelector("#view-title").textContent, "学习统计");
   assert.equal(w.document.querySelector("#query").value, "");
 });
+
+test("library deletion confirms scope, preserves data on cancel and restores each record kind from the recycle bin", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "lc-trash-ui-"));
+  const store = openStore(join(dir, "db"));
+  const human = { origin: "human", id: "chrome-ui", name: "用户" };
+  const run = (cmd, params = {}) => store.execute(cmd, params, human);
+  const r = run("resources.upsert", {
+    url: "https://example.com/learning",
+    title: "Trash source",
+  });
+  const a = run("anchors.upsert", {
+    resourceId: r.id,
+    quote: "Original context",
+  });
+  const { vocabulary: v, occurrence: o } = run("vocabulary.save", {
+    anchorId: a.id,
+    word: "context",
+    meaning: "语境",
+  });
+  const n = run("notes.append", { anchorId: a.id, text: "Thought" });
+  const dom = new JSDOM(
+    readFileSync("apps/extension/lib/library.html", "utf8"),
+    { url: "https://example.com", runScripts: "outside-only" },
+  );
+  const w = dom.window;
+  t.onTestFinished(() => {
+    w.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  let loseResponse = true,
+    requestId;
+  w.chrome = {
+    runtime: {
+      connect: () => ({ onMessage: { addListener() {} } }),
+      sendMessage: async (m) => {
+        try {
+          const result = run(m.command, m.params);
+          if (m.command === "records.setDeleted" && loseResponse) {
+            loseResponse = false;
+            requestId = m.params.operationId;
+            return { ok: false, error: "响应丢失" };
+          }
+          if (m.command === "records.setDeleted" && requestId) {
+            assert.equal(m.params.operationId, requestId);
+            requestId = undefined;
+          }
+          return { ok: true, result };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      },
+    },
+  };
+  w.eval(script("common"));
+  w.eval(script("library"));
+  const click = (text, scope = w.document) => {
+    const b = [...scope.querySelectorAll("button")].find(
+      (b) => b.textContent === text,
+    );
+    assert.ok(b, text);
+    b.click();
+  };
+  const settle = () => pause(25);
+  const dialog = () => w.document.querySelector("dialog");
+  const confirm = async () => {
+    click("移入回收站", dialog());
+    await settle();
+  };
+  const restore = async () => {
+    click("回收站");
+    await settle();
+    assert.equal(
+      w.document.querySelector("#breadcrumbs").textContent,
+      "资料库回收站",
+    );
+    click("恢复");
+    assert.ok(dialog());
+    click("恢复", dialog());
+    await settle();
+    assert.equal(dialog(), null);
+    assert.match(
+      w.document.querySelector("#content").textContent,
+      /回收站是空的/,
+    );
+  };
+  await settle();
+  click("全部资源");
+  await settle();
+  click("查看资源记录");
+  await settle();
+  click("删除笔记");
+  assert.match(dialog().textContent, /只移除这条记录/);
+  assert.equal(w.document.activeElement.textContent, "取消");
+  click("取消");
+  assert.equal(run("notes.list").total, 1);
+  click("删除笔记");
+  await confirm();
+  assert.ok(dialog());
+  assert.match(dialog().textContent, /响应丢失/);
+  await confirm();
+  assert.equal(dialog(), null);
+  assert.equal(run("notes.list").total, 0);
+  assert.equal(run("records.history", { id: n.id }).length, 2);
+  await restore();
+  click("全部资源");
+  await settle();
+  click("查看资源记录");
+  await settle();
+  click("删除资源");
+  assert.match(dialog().textContent, /全局词条与复习历史保留/);
+  await confirm();
+  assert.equal(run("resources.list").total, 0);
+  assert.equal(w.document.querySelector("#view-title").textContent, "全部资源");
+  assert.equal(run("notes.list").total, 0);
+  await restore();
+  click("单词簿");
+  await settle();
+  click("删除单词");
+  assert.match(dialog().textContent, /所有语境及复习记录/);
+  await confirm();
+  assert.equal(run("vocabulary.list").total, 0);
+  await restore();
+  click("单词簿");
+  await settle();
+  click("删除这处语境");
+  await confirm();
+  assert.equal(run("occurrences.list").total, 0);
+  assert.equal(run("vocabulary.list").total, 1);
+  assert.match(
+    w.document.querySelector("#content").textContent,
+    /暂无可见语境/,
+  );
+  await restore();
+  for (const id of [r.id, v.id, o.id, n.id])
+    assert.equal(run("records.get", { id }).deleted, false);
+  click("思考笔记");
+  await settle();
+  click("删除笔记");
+  const fresh = run("records.get", { id: n.id });
+  run("notes.update", {
+    id: n.id,
+    expectedRevision: fresh.revision,
+    text: "Concurrent change",
+  });
+  await confirm();
+  assert.match(dialog().textContent, /记录已更新/);
+  assert.equal(run("notes.list").total, 1);
+  click("取消");
+});

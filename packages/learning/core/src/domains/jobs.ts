@@ -1,8 +1,18 @@
 import { canonical, fail, hash, str } from "../shared.js";
 import type { Repository, Handler } from "../repository.js";
 export function createJobs(repository: Repository): Record<string, Handler> {
-  const { db, get, maybe, put, rows, save, resourceFor, anchorFor } =
-    repository;
+  const {
+    db,
+    get,
+    maybe,
+    put,
+    rows,
+    save,
+    resourceFor,
+    anchorFor,
+    isDeleted,
+    active,
+  } = repository;
   return {
     "jobs.submit": (p, actor) => {
       let result;
@@ -83,6 +93,7 @@ export function createJobs(repository: Repository): Record<string, Handler> {
       if (actor.id !== "chrome-ui") fail("仅扩展可领取", "FORBIDDEN");
       for (const j of rows("job").filter(
         (x) =>
+          !isDeleted(x) &&
           x.status === "running" &&
           Date.now() - Date.parse(x.updatedAt) > 180000,
       ))
@@ -98,7 +109,7 @@ export function createJobs(repository: Repository): Record<string, Handler> {
         );
       const j = rows("job")
         .reverse()
-        .find((x) => x.status === "queued");
+        .find((x) => x.status === "queued" && !isDeleted(x));
       result = j ? save("job", { ...j, status: "running" }, actor, j.id) : null;
 
       return result;
@@ -107,6 +118,7 @@ export function createJobs(repository: Repository): Record<string, Handler> {
       let result;
       if (actor.id !== "chrome-ui") fail("仅扩展可完成", "FORBIDDEN");
       const j = get(p.id);
+      active(j);
       if (j.kind !== "job" || j.status !== "running")
         fail("任务状态已改变", "CONFLICT");
       const ai = {

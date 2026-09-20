@@ -4,7 +4,7 @@ import type { Repository, Handler } from "../repository.js";
 export function createVocabulary(
   repository: Repository,
 ): Record<string, Handler> {
-  const { db, get, maybe, put, rows, save, resourceFor, anchorFor } =
+  const { db, get, maybe, put, rows, save, resourceFor, anchorFor, active } =
     repository;
   return {
     "vocabulary.save": (p, actor) => {
@@ -31,6 +31,7 @@ export function createVocabulary(
           actor,
           maybe(id) ? randomUUID() : id,
         );
+      active(v);
       const oid = "o_" + hash(v.id + ":" + a.id + ":" + word);
       result = {
         vocabulary: v,
@@ -53,10 +54,11 @@ export function createVocabulary(
           ),
       };
 
+      active(result.occurrence);
       return result;
     },
     "vocabulary.update": (p, actor) => {
-      const v = get(p.id);
+      const v = active(get(p.id));
       if (v.kind !== "vocabulary") fail("需要词条 ID");
       if (v.revision !== p.expectedRevision)
         fail("词条已更新，请重新打开编辑", "CONFLICT");
@@ -73,11 +75,11 @@ export function createVocabulary(
         fail("该词条已存在，请在单词簿中编辑已有词条", "CONFLICT");
       // Keep stable IDs so review history and external Agent references survive corrections.
       for (const o of rows("occurrence").filter((o) => o.vocabularyId === v.id))
-        save("occurrence", { ...o, word }, actor, o.id);
+        save("occurrence", { ...o, word }, actor, o.id, true);
       return save("vocabulary", { ...v, word }, actor, v.id);
     },
     "occurrences.update": (p, actor) => {
-      const o = get(p.id);
+      const o = active(get(p.id));
       if (o.kind !== "occurrence") fail("需要词汇语境 ID");
       if (o.revision !== p.expectedRevision)
         fail("释义已更新，请重新打开编辑", "CONFLICT");
@@ -90,7 +92,7 @@ export function createVocabulary(
     },
     "reviews.record": (p, actor) => {
       let result;
-      const v = get(p.vocabularyId);
+      const v = active(get(p.vocabularyId));
       if (
         v.kind !== "vocabulary" ||
         !["again", "hard", "good"].includes(p.rating)
