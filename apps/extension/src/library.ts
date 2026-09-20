@@ -1,7 +1,7 @@
 const { api, call, el, button, all } = LC;
 const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id)! as T;
-let view = "resources.list",
+let view = "stats",
   detailResource: any = null,
   renderGeneration = 0,
   lastRenderKey = "";
