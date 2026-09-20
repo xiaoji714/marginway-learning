@@ -31,6 +31,16 @@ TypeScript 源码、pnpm workspace、Node 22.23.2、Vitest + V8、tsc、esbuild�
 
 GitHub-hosted Linux/macOS/Windows 执行隔离安装烟测。Windows 烟测跳过真实注册表写入；自动化脚本通过不等于 Chrome UI 和桥接注册的跨平台实机验收。版本与草稿发布见 releases.md。
 
+## 开发入口
+
+源码获取和首次安装见 [安装说明](installation.md)。`pnpm run ci` 是完整门禁；日常使用 build、typecheck、test、test:coverage、doc-sync。升版与 package 见 [发布说明](releases.md)，不要把测试覆盖率作为面向新用户的产品承诺。
+
+## 产品截图
+
+`pnpm run build` 后运行 `pnpm exec tsx scripts/product-demo.ts`，打开输出的本机地址：`/card` 为现有语境卡片，`/library.html` 为现有资料库。只读演示使用临时 SQLite、合成文本和固定释义，Chrome RPC/供应商边界被替换，不连接个人库或服务；不是浏览器插件端到端验收。Ctrl+C 退出清理临时目录。
+
+README 两张 PNG 用上述当前组件渲染后在浏览器截取，不修改组件布局、不使用概念图或私人截图。重新截图库需进入「全部资源 → 查看资源记录」。演示包装页仅用于呈现组件；组件以 apps/extension 为唯一实现来源。
+
 ## 决策与协作
 
 协作、Issue 状态与 PR 门禁见 [开发流程](development-process.md)；文档与决策记录按各自职责维护。
