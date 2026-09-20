@@ -10,6 +10,7 @@ export const caps = {
       "CONFLICT",
       "FORBIDDEN",
       "NOT_FOUND",
+      "DELETED",
       "INTERNAL",
     ],
     retry:

@@ -59,10 +59,15 @@ try {
       ).version,
     };
   } else if (cmd === "skill") {
-    const installed = join(import.meta.dirname, "skills/SKILL.md");
-    const path = existsSync(installed)
-      ? installed
-      : join(import.meta.dirname, "../../../skills/SKILL.md");
+    const path = [
+      join(import.meta.dirname, "skills/SKILL.md"),
+      join(import.meta.dirname, "../skills/SKILL.md"),
+      join(import.meta.dirname, "../../../skills/SKILL.md"),
+    ].find(existsSync);
+    if (!path)
+      throw Object.assign(new Error("Skill 未找到，请重新安装完整发布包"), {
+        code: "NOT_FOUND",
+      });
     result = {
       path,
       content: readFileSync(path, "utf8"),

@@ -25,6 +25,7 @@ test("CLI rejects malformed options and supports discoverable independent learni
     expect(r.status, r.stderr).toBe(0);
     return JSON.parse(r.stdout).result;
   };
+  expect(call("capabilities").transport.errors).toContain("DELETED");
   expect(call("--help").usage).toContain("--input");
   expect(call("--version").version).toMatch(/^\d+\.\d+\.\d+$/);
   expect(call("skill").content).toContain("Marginway");

@@ -141,6 +141,9 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
           id: o.id,
           kind: o.kind,
           createdAt: o.createdAt,
+          origin: o.origin,
+          createdBy: o.createdBy,
+          feedbackSource: o.feedbackSource,
           resourceId: o.resourceId,
         }));
       const offset = Math.max(0, Number(p.offset) || 0),

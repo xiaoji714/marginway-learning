@@ -503,7 +503,7 @@ function activityHeatmap(events: DataRecord[], today = new Date()) {
     detail,
     el(
       "p",
-      `${key(start)} — ${key(end)} · 按本地日期统计你保存的词句、新笔记和复习反馈；编辑不重复计数，自动翻译与 Agent 生成内容不计入。`,
+      `${key(start)} — ${key(end)} · 按本地日期统计你保存的词句、新笔记和复习反馈；编辑不重复计数，含 Agent 代记的用户明确复习反馈；自动翻译与其他 Agent 生成内容不计入。`,
       "muted stats-footnote",
     ),
   );

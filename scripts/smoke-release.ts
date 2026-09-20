@@ -1,5 +1,6 @@
 import {
   existsSync,
+  realpathSync,
   mkdtempSync,
   readFileSync,
   mkdirSync,
@@ -30,6 +31,16 @@ try {
         file,
       );
   }
+  const unpackedSkill = spawnSync(
+    process.execPath,
+    ["--no-warnings", join(temp, "media/runtime/learning.js"), "skill"],
+    { encoding: "utf8" },
+  );
+  assert.equal(unpackedSkill.status, 0, unpackedSkill.stderr);
+  assert.equal(
+    realpathSync(JSON.parse(unpackedSkill.stdout).result.path),
+    realpathSync(join(temp, "media/skills/SKILL.md")),
+  );
   const home = join(temp, "home"),
     dir = join(temp, "chosen-extension");
   const foreign = join(temp, "unrelated-folder");
