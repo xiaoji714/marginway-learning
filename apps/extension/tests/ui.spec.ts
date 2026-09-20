@@ -990,12 +990,28 @@ test("library edits resources, words, context meanings and notes through the sto
     store.close();
     rmSync(dir, { recursive: true, force: true });
   });
+  const lostResponses = new Set([
+    "resources.update",
+    "vocabulary.update",
+    "occurrences.update",
+    "notes.update",
+  ]);
+  const attempts = new Map();
   w.chrome = {
     runtime: {
       connect: () => ({ onMessage: { addListener() {} } }),
       sendMessage: async (m) => {
         try {
-          return { ok: true, result: run(m.command, m.params) };
+          const result = run(m.command, m.params);
+          if (lostResponses.delete(m.command)) {
+            attempts.set(m.command, m.params.operationId);
+            return { ok: false, error: "模拟响应丢失" };
+          }
+          if (attempts.has(m.command)) {
+            assert.equal(m.params.operationId, attempts.get(m.command));
+            attempts.delete(m.command);
+          }
+          return { ok: true, result };
         } catch (e) {
           return { ok: false, error: e.message };
         }
@@ -1017,6 +1033,19 @@ test("library edits resources, words, context meanings and notes through the sto
   const save = async () => {
     click("保存", w.document.querySelector("dialog"));
     await pause(30);
+    if (
+      w.document
+        .querySelector("dialog [role=status]")
+        ?.textContent.includes("模拟响应丢失")
+    ) {
+      click("保存", w.document.querySelector("dialog"));
+      await pause(30);
+      assert.equal(
+        w.document.querySelector("dialog"),
+        null,
+        "unchanged retries reuse the committed operation",
+      );
+    }
   };
   await pause(20);
   click("全部资源");

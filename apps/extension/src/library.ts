@@ -148,7 +148,7 @@ type EditField = {
 function editDialog(
   title: string,
   fields: EditField[],
-  save: (values: Record<string, string>) => Promise<any>,
+  save: (values: Record<string, string>, operationId: string) => Promise<any>,
   hint = "",
 ) {
   const d = el("dialog", null, "dialog");
@@ -175,6 +175,7 @@ function editDialog(
   submit.type = "submit";
   const cancel = button("取消", () => (d.close ? d.close() : d.remove()));
   cancel.type = "button";
+  let attempt: { fingerprint: string; operationId: string } | undefined;
   form.onsubmit = async (event) => {
     event.preventDefault();
     if (submit.disabled) return;
@@ -188,7 +189,10 @@ function editDialog(
     submit.disabled = true;
     cancel.disabled = true;
     try {
-      await save(values);
+      const fingerprint = JSON.stringify(values);
+      if (!attempt || attempt.fingerprint !== fingerprint)
+        attempt = { fingerprint, operationId: crypto.randomUUID() };
+      await save(values, attempt.operationId);
       d.remove();
       lastRenderKey = "";
       await render();
@@ -228,7 +232,7 @@ function editResource(item: any) {
         value: (item.tags || []).join(", "),
       },
     ],
-    ({ title, tags }) =>
+    ({ title, tags }, operationId) =>
       api("resources.update", {
         id: item.id,
         expectedRevision: item.revision,
@@ -237,7 +241,7 @@ function editResource(item: any) {
           .split(/[,，]/)
           .map((x) => x.trim())
           .filter(Boolean),
-        operationId: crypto.randomUUID(),
+        operationId,
       }),
     "修改名称与分类，不改变来源网址和原文语境。",
   );
@@ -254,12 +258,12 @@ function editWord(item: any) {
         maxLength: 300,
       },
     ],
-    ({ word }) =>
+    ({ word }, operationId) =>
       api("vocabulary.update", {
         id: item.id,
         expectedRevision: item.revision,
         word,
-        operationId: crypto.randomUUID(),
+        operationId,
       }),
     "修改会应用于这个词条的所有语境，原文与复习记录保持不变。",
   );
@@ -276,12 +280,12 @@ function editMeaning(item: any) {
         maxLength: 4000,
       },
     ],
-    ({ meaning }) =>
+    ({ meaning }, operationId) =>
       api("occurrences.update", {
         id: item.id,
         expectedRevision: item.revision,
         meaning,
-        operationId: crypto.randomUUID(),
+        operationId,
       }),
     "只修改这处语境的释义，其他语境不受影响。",
   );
@@ -314,12 +318,12 @@ async function noteCard(item: any) {
               required: true,
             },
           ],
-          ({ text }) =>
+          ({ text }, operationId) =>
             api("notes.update", {
               id: item.id,
               expectedRevision: item.revision,
               text,
-              operationId: crypto.randomUUID(),
+              operationId,
             }),
         ),
       ),
