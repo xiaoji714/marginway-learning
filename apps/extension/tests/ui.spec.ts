@@ -897,3 +897,57 @@ test("YouTube homepage with stale video title is not auto-registered by page pol
       );
   }
 });
+
+test("late video registration cannot overwrite sidebar after navigation to YouTube home", async (t) => {
+  const dom = new JSDOM(readFileSync("apps/extension/lib/panel.html", "utf8"), {
+    url: "https://example.com",
+    runScripts: "outside-only",
+  });
+  const w = dom.window;
+  t.onTestFinished(() => w.close());
+  let tick, finish;
+  let url = "https://www.youtube.com/watch?v=abcdefghijk";
+  const requests = [];
+  w.setInterval = (fn) => (tick = fn);
+  w.chrome = {
+    runtime: {
+      connect: () => ({ onMessage: { addListener() {} } }),
+      sendMessage: async (m) => {
+        requests.push(m);
+        return {
+          ok: true,
+          result:
+            m.command === "resources.upsert"
+              ? await new Promise((r) => (finish = r))
+              : { items: [], next: null },
+        };
+      },
+    },
+    tabs: { query: async () => [{ id: 1, url, title: "Video title" }] },
+  };
+  w.eval(script("common"));
+  w.eval(script("panel"));
+  await pause(10);
+  url = "https://www.youtube.com/";
+  await tick();
+  finish({
+    id: "r",
+    type: "video",
+    url: "https://www.youtube.com/watch?v=abcdefghijk",
+    title: "Old title",
+  });
+  await pause(10);
+  assert.match(
+    w.document.getElementById("title").textContent,
+    /打开一个 YouTube 视频/,
+  );
+  assert.equal(
+    requests.filter((m) => m.command === "resources.upsert").length,
+    1,
+  );
+  assert.equal(
+    requests.some((m) => m.command === "jobs.submit"),
+    false,
+  );
+  assert.equal(w.document.getElementById("translation-progress").hidden, true);
+});

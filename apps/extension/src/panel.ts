@@ -32,39 +32,53 @@ async function load(fetchCaptions = true) {
   const gen = ++generation;
   currentDialog?.dispose();
   currentDialog = null;
-  tab = await active();
-  if (!/^https?:/.test(tab?.url || ""))
+  const targetTab = await active();
+  if (gen !== generation) return;
+  tab = targetTab;
+  refreshSequence++;
+  if (!/^https?:/.test(targetTab?.url || ""))
     throw new Error("请打开 YouTube 视频或普通网页");
-  const currentUrl = new URL(tab.url);
+  const currentUrl = new URL(targetTab.url);
   if (
     /(^|\.)youtube\.com$/.test(currentUrl.hostname) &&
     currentUrl.pathname !== "/watch"
   ) {
     resource = null;
     anchors = [];
+    $("follow").hidden = true;
+    $("load").hidden = true;
+    $("translation-progress").hidden = true;
+    $("status").className = "status";
     $("timeline").replaceChildren();
     $("title").textContent = "打开一个 YouTube 视频，开始学习";
     $("status").textContent = "首页、搜索和频道页不会自动加入资料库。";
     return;
   }
   try {
-    await call({ lc: "activate", tabId: tab.id });
+    await call({ lc: "activate", tabId: targetTab.id });
+    if (gen !== generation) return;
     pendingOrigin = null;
     $("load").hidden = true;
   } catch (e) {
+    if (gen !== generation) return;
     $("load").hidden = false;
-    pendingOrigin = new URL(tab.url).origin + "/*";
+    pendingOrigin = new URL(targetTab.url).origin + "/*";
     $("load").textContent = "启用当前网页";
     throw new Error(
       "点击“启用当前网页”允许读取此网站，之后即可划词翻译和记笔记。",
     );
   }
-  const u = new URL(tab.url);
+  const u = new URL(targetTab.url);
   const url =
     u.hostname === "www.youtube.com" && u.pathname === "/watch"
       ? `https://www.youtube.com/watch?v=${u.searchParams.get("v")}`
-      : tab.url.split("#")[0];
-  resource = await api("resources.upsert", { url, title: tab.title });
+      : targetTab.url.split("#")[0];
+  const resolved = await api("resources.upsert", {
+    url,
+    title: targetTab.title,
+  });
+  if (gen !== generation) return;
+  resource = resolved;
   $("title").textContent = resource.title;
   $("title").title = resource.title;
   $("status").className = "status";
@@ -75,6 +89,7 @@ async function load(fetchCaptions = true) {
       resourceId: resource.id,
       limit: 1,
     });
+    if (gen !== generation) return;
     if (!found.total) {
       $("status").textContent = "正在获取字幕…";
       const j = await api("jobs.submit", {
@@ -109,7 +124,7 @@ async function refresh() {
     all("translations.list", { resourceId: rid }),
     all("occurrences.list", { resourceId: rid }),
   ]);
-  if (seq !== refreshSequence || rid !== resource.id) return;
+  if (seq !== refreshSequence || rid !== resource?.id) return;
   anchors = a.sort((x, y) => (x.start ?? Infinity) - (y.start ?? Infinity));
   notes = n;
   translations = t;
