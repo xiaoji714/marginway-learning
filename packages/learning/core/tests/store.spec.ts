@@ -330,3 +330,245 @@ test("case correction can recapture the original spelling without overwriting oc
     next.occurrence.id,
   );
 });
+
+test("recycle bin hides descendants, preserves shared vocabulary and independently deleted children, and restores without new activity", (t) => {
+  const { s, r, a } = fixture(t);
+  const run = (cmd, params = {}, actor = human) =>
+    s.execute(cmd, params, actor);
+  const trash = (record, deleted = true) =>
+    run("records.setDeleted", {
+      id: record.id,
+      expectedRevision: record.revision,
+      deleted,
+    });
+  const r2 = run("resources.upsert", { url: "https://example.com/other" });
+  const a2 = run("anchors.upsert", {
+    resourceId: r2.id,
+    quote: "Second context",
+  });
+  const n = run("notes.append", { anchorId: a.id, text: "Independent note" });
+  const n2 = run("notes.append", { anchorId: a.id, text: "Inherited note" });
+  const n3 = run("notes.append", {
+    anchorId: a2.id,
+    text: "Other resource note",
+  });
+  const capture = run("vocabulary.save", { anchorId: a.id, word: "context" });
+  const elsewhere = run("vocabulary.save", {
+    anchorId: a2.id,
+    word: "context",
+  });
+  run("reviews.record", {
+    vocabularyId: capture.vocabulary.id,
+    rating: "good",
+  });
+  const v = run("records.get", { id: capture.vocabulary.id });
+  const initialActivity = run("activity.list").total;
+  const hiddenNote = trash(n);
+  assert.equal(run("notes.list").total, 2);
+  assert.equal(
+    run("context.export", { anchorId: a.id }).context.notes.length,
+    1,
+  );
+  assert.throws(
+    () =>
+      run("notes.update", {
+        id: n.id,
+        expectedRevision: hiddenNote.revision,
+        text: "overwrite",
+      }),
+    { code: "DELETED" },
+  );
+  assert.equal(run("activity.list").total, initialActivity - 1);
+  const hiddenResource = trash(r);
+  assert.deepEqual(
+    run("notes.list").items.map((n) => n.id),
+    [n3.id],
+  );
+  assert.deepEqual(
+    run("occurrences.list").items.map((o) => o.id),
+    [elsewhere.occurrence.id],
+  );
+  assert.equal(
+    run("vocabulary.list").total,
+    1,
+    "shared global word survives resource deletion",
+  );
+  assert.equal(run("stats").resource, 1);
+  assert.equal(run("stats").note, 1);
+  assert.equal(run("search", { query: "Inherited" }).total, 0);
+  assert.equal(run("anchors.list", { resourceId: r.id }).total, 0);
+  for (const [cmd, params] of [
+    ["resources.upsert", { url: r.url }],
+    [
+      "resources.update",
+      { id: r.id, expectedRevision: hiddenResource.revision, title: "again" },
+    ],
+    ["anchors.upsert", { resourceId: r.id, quote: "Again" }],
+    ["notes.append", { anchorId: a.id, text: "Again" }],
+    ["vocabulary.save", { anchorId: a.id, word: "new" }],
+    ["context.export", { anchorId: a.id }],
+    ["jobs.submit", { resourceId: r.id, type: "transcript" }],
+  ])
+    assert.throws(() => run(cmd, params), { code: "DELETED" });
+  assert.throws(() => trash(hiddenNote, false), { code: "DELETED" });
+  const hiddenWord = trash(v);
+  assert.equal(run("occurrences.list").total, 0);
+  assert.equal(run("reviews.list").total, 0);
+  assert.equal(run("vocabulary.list", { due: true }).total, 0);
+  assert.equal(run("stats").vocabulary, undefined);
+  assert.throws(
+    () => run("reviews.record", { vocabularyId: v.id, rating: "good" }),
+    { code: "DELETED" },
+  );
+  assert.throws(
+    () => run("vocabulary.save", { anchorId: a2.id, word: "context" }),
+    { code: "DELETED" },
+  );
+  const first = run("trash.list", { limit: 2 });
+  assert.equal(first.total, 3);
+  assert.equal(run("trash.list", { offset: first.next }).items.length, 1);
+  trash(hiddenWord, false);
+  assert.equal(run("occurrences.list").total, 1);
+  const restored = trash(hiddenResource, false);
+  assert.equal(
+    run("notes.list").total,
+    2,
+    "restoring a resource does not undo a direct note deletion",
+  );
+  assert.equal(run("records.get", { id: n2.id }).revision, n2.revision);
+  assert.equal(restored.createdAt, r.createdAt);
+  assert.deepEqual(restored.createdBy, r.createdBy);
+  trash(hiddenNote, false);
+  assert.equal(run("notes.list").total, 3);
+  assert.equal(run("activity.list").total, initialActivity);
+  assert.equal(run("trash.list").total, 0);
+});
+
+test("individual context deletion is audited, revision guarded, replayable and backup compatible", (t) => {
+  const { s, r, a } = fixture(t);
+  const run = (cmd, params = {}, actor = human) =>
+    s.execute(cmd, params, actor);
+  const { vocabulary: v, occurrence: o } = run("vocabulary.save", {
+    anchorId: a.id,
+    word: "context",
+    meaning: "语境",
+  });
+  const params = {
+    id: o.id,
+    expectedRevision: o.revision,
+    deleted: true,
+    operationId: "delete-context",
+  };
+  const removed = run("records.setDeleted", params, agent);
+  assert.deepEqual(run("records.setDeleted", params, agent), removed);
+  assert.equal(removed.origin, o.origin);
+  assert.deepEqual(removed.editedBy, agent);
+  assert.equal(run("records.history", { id: o.id }).length, 2);
+  assert.equal(run("occurrences.list").total, 0);
+  assert.equal(run("vocabulary.list").total, 1);
+  assert.throws(
+    () => run("vocabulary.save", { anchorId: a.id, word: "context" }),
+    { code: "DELETED" },
+  );
+  assert.throws(
+    () =>
+      run("occurrences.update", {
+        id: o.id,
+        expectedRevision: removed.revision,
+        meaning: "x",
+      }),
+    { code: "DELETED" },
+  );
+  for (const p of [
+    { ...params, id: a.id, operationId: "bad-kind" },
+    { ...params, deleted: "yes", operationId: "bad-type" },
+    { ...params, expectedRevision: 1, operationId: "stale" },
+  ])
+    assert.throws(() => run("records.setDeleted", p));
+  const noop = run("records.setDeleted", {
+    id: o.id,
+    deleted: true,
+    expectedRevision: removed.revision,
+  });
+  assert.equal(noop.revision, removed.revision);
+  run("vocabulary.update", {
+    id: v.id,
+    expectedRevision: v.revision,
+    word: "Context",
+  });
+  const updated = run("records.get", { id: o.id });
+  assert.equal(updated.deleted, true);
+  assert.equal(updated.word, "Context");
+  const deletedResource = run("records.setDeleted", {
+    id: r.id,
+    expectedRevision: r.revision,
+    deleted: true,
+  });
+  const backup = run("export");
+  const dir = mkdtempSync(join(tmpdir(), "lc-trash-backup-"));
+  const clone = openStore(join(dir, "db"));
+  t.onTestFinished(() => {
+    clone.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  clone.execute("backup.import", { data: backup });
+  assert.equal(clone.execute("trash.list").total, 2);
+  assert.equal(clone.execute("occurrences.list").total, 0);
+  clone.execute("records.setDeleted", {
+    id: r.id,
+    expectedRevision: deletedResource.revision,
+    deleted: false,
+  });
+  clone.execute("records.setDeleted", {
+    id: o.id,
+    expectedRevision: updated.revision,
+    deleted: false,
+  });
+  assert.equal(clone.execute("occurrences.list").items[0].meaning, "语境");
+  assert.equal(clone.execute("occurrences.list").items[0].anchorId, a.id);
+});
+
+test("resource deletion cancels queued work and rejects late completions without reviving captures", (t) => {
+  const { s, r, a } = fixture(t);
+  const run = (cmd, params = {}) => s.execute(cmd, params, human);
+  const j = run("jobs.submit", { resourceId: r.id, type: "transcript" });
+  run("jobs.claim");
+  const q = run("jobs.submit", {
+    resourceId: r.id,
+    type: "lookup",
+    anchorId: a.id,
+    text: "context",
+  });
+  const r2 = run("resources.upsert", {
+    url: "https://www.youtube.com/watch?v=ijklmnopqrs",
+  });
+  const other = run("jobs.submit", { resourceId: r2.id, type: "transcript" });
+  const tombstone = run("records.setDeleted", {
+    id: r.id,
+    expectedRevision: r.revision,
+    deleted: true,
+  });
+  for (const id of [j.id, q.id])
+    assert.equal(run("records.get", { id }).status, "cancelled");
+  assert.throws(
+    () =>
+      run("jobs.complete", {
+        id: j.id,
+        segments: [{ text: "Late", start: 1 }],
+      }),
+    { code: "DELETED" },
+  );
+  assert.equal(run("jobs.claim").id, other.id);
+  assert.equal(run("jobs.claim"), null);
+  run("records.setDeleted", {
+    id: r.id,
+    expectedRevision: tombstone.revision,
+    deleted: false,
+  });
+  assert.equal(
+    run("jobs.claim"),
+    null,
+    "restoring must not restart cancelled requests",
+  );
+  assert.equal(run("anchors.list", { resourceId: r.id }).total, 1);
+});

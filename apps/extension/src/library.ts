@@ -12,6 +12,10 @@ const views: Record<string, [string, string]> = {
   review: ["今日复习", "先回想语境，再查看答案，按真实记忆程度记录。"],
   "jobs.list": ["任务状态", "查看字幕获取与翻译的进度。"],
   stats: ["学习统计", "查看这台电脑上积累的学习记录。"],
+  "trash.list": [
+    "回收站",
+    "删除的资料保留在本机，可随时恢复；恢复关联记录前，请先恢复所属资源或词条。",
+  ],
   search: ["搜索结果", "同时查找资源、原文、词汇、笔记与分类。"],
 };
 const jobNames: Record<string, string> = {
@@ -150,6 +154,7 @@ function editDialog(
   fields: EditField[],
   save: (values: Record<string, string>, operationId: string) => Promise<any>,
   hint = "",
+  submitLabel = "保存",
 ) {
   const d = el("dialog", null, "dialog");
   d.setAttribute("aria-label", title);
@@ -171,7 +176,11 @@ function editDialog(
   const status = el("div", null, "status");
   status.setAttribute("role", "status");
   const actions = el("div", null, "actions");
-  const submit = el("button", "保存", "primary");
+  const submit = el(
+    "button",
+    submitLabel,
+    submitLabel === "移入回收站" ? "danger" : "primary",
+  );
   submit.type = "submit";
   const cancel = button("取消", () => (d.close ? d.close() : d.remove()));
   cancel.type = "button";
@@ -197,7 +206,9 @@ function editDialog(
       lastRenderKey = "";
       await render();
     } catch (e) {
-      status.textContent = `${e.message}。内容已保留；如有版本冲突，请复制草稿后取消并重新打开编辑。`;
+      status.textContent = fields.length
+        ? `${e.message}。内容已保留；如有版本冲突，请复制草稿后取消并重新打开编辑。`
+        : `${e.message}。请取消后重新打开再试。`;
     } finally {
       submit.disabled = false;
       cancel.disabled = false;
@@ -213,7 +224,45 @@ function editDialog(
   d.addEventListener("close", () => d.remove());
   if (d.showModal) d.showModal();
   else d.setAttribute("open", "");
-  inputs.values().next().value?.focus();
+  (inputs.values().next().value || submit).focus();
+}
+const recordNames: Record<string, string> = {
+  resource: "资源",
+  vocabulary: "单词",
+  occurrence: "这处语境",
+  note: "笔记",
+};
+function trashAction(item: any, deleted = true) {
+  const name = recordNames[item.kind]!;
+  const label = deleted ? `删除${name}` : `恢复${name}`;
+  const scope =
+    item.kind === "resource"
+      ? "该资源的笔记、词汇语境、字幕将一并隐藏，未完成的任务会取消。全局词条与复习历史保留，其他资源不受影响。"
+      : item.kind === "vocabulary"
+        ? "该词条的所有语境及复习记录将一并隐藏，资源和笔记不受影响。"
+        : "只移除这条记录，原文和其他记录不受影响。";
+  editDialog(
+    label,
+    [],
+    async (_values, operationId) => {
+      const result = await api("records.setDeleted", {
+        id: item.id,
+        expectedRevision: item.revision,
+        deleted,
+        operationId,
+      });
+      if (deleted && detailResource?.id === item.id) detailResource = null;
+      return result;
+    },
+    `${item.title || item.word || item.text || name}
+${deleted ? scope + " 可在回收站恢复。" : "恢复后回到原来的位置；先前单独删除的关联记录保持删除状态。"}`,
+    deleted ? "移入回收站" : "恢复",
+  );
+}
+function deleteButton(item: any) {
+  const b = button(`删除${recordNames[item.kind]}`, () => trashAction(item));
+  b.classList.add("danger-text");
+  return b;
 }
 function editResource(item: any) {
   editDialog(
@@ -341,6 +390,7 @@ async function noteCard(item: any) {
       button("编辑释义", () => editMeaning(item)),
     );
   }
+  actions.append(deleteButton(item));
   card.append(actions);
   return card;
 }
@@ -517,7 +567,16 @@ async function render() {
   const fragment = document.createDocumentFragment();
   for (const item of items) {
     let card = el("article", null, "record");
-    if (item.kind === "resource") {
+    if (currentView === "trash.list") {
+      card.append(
+        provenance(item),
+        el("h2", item.title || item.word || item.text),
+        el("p", `${recordNames[item.kind]} · 已移入回收站`, "muted"),
+      );
+      const actions = el("div", null, "actions");
+      actions.append(button("恢复", () => trashAction(item, false)));
+      card.append(actions);
+    } else if (item.kind === "resource") {
       card.classList.add("resource-card");
       card.append(
         el("span", item.type === "video" ? "视频" : "网页", "badge"),
@@ -537,6 +596,7 @@ async function render() {
       actions.append(
         open,
         button("编辑资源", () => editResource(item)),
+        deleteButton(item),
       );
       card.append(tags, actions);
     } else if (item.kind === "vocabulary") {
@@ -547,6 +607,10 @@ async function render() {
         el("h2", review ? "回想这个词" : item.word, "word-title"),
       );
       const os = await all("occurrences.list", { vocabularyId: item.id });
+      if (!os.length)
+        card.append(
+          el("p", "暂无可见语境，可在回收站恢复相关资源或语境。", "muted"),
+        );
       const answer = el("div", null, "review-answer");
       if (review) {
         answer.hidden = true;
@@ -576,13 +640,19 @@ async function render() {
         if (review) answer.append(meaning);
         else {
           const actions = el("div", null, "actions");
-          actions.append(button("编辑释义", () => editMeaning(o)));
+          actions.append(
+            button("编辑释义", () => editMeaning(o)),
+            deleteButton(o),
+          );
           block.append(meaning, actions);
         }
       }
       if (!review) {
         const actions = el("div", null, "actions");
-        actions.append(button("编辑单词", () => editWord(item)));
+        actions.append(
+          button("编辑单词", () => editWord(item)),
+          deleteButton(item),
+        );
         card.append(actions);
       }
       card.append(answer);
@@ -699,26 +769,34 @@ async function render() {
   }
   if (!items.length) {
     const copy =
-      currentView === "search"
-        ? ["没有找到匹配记录", "试试原文里的词、资源名称或分类标签。"]
-        : currentView === "review"
-          ? [
-              "今天的复习已完成",
-              "之后有词条到期，会出现在这里。也可以去单词簿自由回顾。",
-            ]
-          : currentView === "jobs.list"
-            ? ["当前没有任务", "获取字幕或使用翻译时，可以在这里查看处理状态。"]
-            : currentView === "notes.list"
+      currentView === "trash.list"
+        ? ["回收站是空的", "删除的资源、单词和笔记会出现在这里，可随时恢复。"]
+        : currentView === "search"
+          ? ["没有找到匹配记录", "试试原文里的词、资源名称或分类标签。"]
+          : currentView === "review"
+            ? [
+                "今天的复习已完成",
+                "之后有词条到期，会出现在这里。也可以去单词簿自由回顾。",
+              ]
+            : currentView === "jobs.list"
               ? [
-                  "把一个想法留在原文旁",
-                  "在网页或字幕中选中文字，写下你的第一条笔记。",
+                  "当前没有任务",
+                  "获取字幕或使用翻译时，可以在这里查看处理状态。",
                 ]
-              : currentView === "vocabulary.list"
+              : currentView === "notes.list"
                 ? [
-                    "从遇见一个词开始",
-                    "在网页或双语字幕中划词，翻译后收藏到单词簿。",
+                    "把一个想法留在原文旁",
+                    "在网页或字幕中选中文字，写下你的第一条笔记。",
                   ]
-                : ["还没有学习资源", "打开一个视频或网页，使用语境开始学习。"];
+                : currentView === "vocabulary.list"
+                  ? [
+                      "从遇见一个词开始",
+                      "在网页或双语字幕中划词，翻译后收藏到单词簿。",
+                    ]
+                  : [
+                      "还没有学习资源",
+                      "打开一个视频或网页，使用语境开始学习。",
+                    ];
     fragment.append(empty(copy[0], copy[1]));
   }
   if (gen === renderGeneration) {
@@ -743,6 +821,10 @@ async function resourceDetails(r: any, gen: any) {
     all("occurrences.list", { resourceId: r.id }),
   ]);
   if (detailResource?.id !== r.id || gen !== renderGeneration) return;
+  if (latest.deleted) {
+    navigate(view);
+    return;
+  }
   r = latest;
   detailResource = latest;
   heading("资源记录", r.title);
@@ -751,6 +833,7 @@ async function resourceDetails(r: any, gen: any) {
   actions.append(
     button("编辑资源", () => editResource(r)),
     link(r),
+    deleteButton(r),
   );
   fragment.append(actions);
   for (const item of [...notes, ...occ]) {

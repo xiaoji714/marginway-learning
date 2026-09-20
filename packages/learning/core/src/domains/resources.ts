@@ -3,7 +3,7 @@ import type { Repository, Handler } from "../repository.js";
 export function createResources(
   repository: Repository,
 ): Record<string, Handler> {
-  const { db, get, maybe, put, rows, save, resourceFor, anchorFor } =
+  const { db, get, maybe, put, rows, save, resourceFor, anchorFor, active } =
     repository;
   return {
     "resources.upsert": (p, actor) => {
@@ -11,6 +11,7 @@ export function createResources(
       const url = canonical(p.url),
         id = "r_" + hash(url),
         prev = maybe(id);
+      if (prev) active(prev);
       result =
         (prev?.archived
           ? save("resource", { ...prev, archived: false }, actor, id)
