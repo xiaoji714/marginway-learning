@@ -1,5 +1,7 @@
 # 安装与开始使用
 
+优先把 [Marginway Skill](../skills/SKILL.md) 交给能操作本机的 Agent；它会从未安装状态引导到配置和验证。下面是供 Agent 查阅或手动操作的完整步骤。
+
 当前是早期开发版：使用桌面 Chrome，从源码构建后加载扩展。没有 Chrome 商店安装入口或免 Node 安装器；手机 Chrome 不支持桌面扩展。macOS 已实测，Windows/Linux 通过隔离安装 CI，仍需真实 Chrome 验证。
 
 ## 准备与构建

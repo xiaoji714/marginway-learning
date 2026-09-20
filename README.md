@@ -4,7 +4,7 @@
 
 在网页和 YouTube 视频旁理解一个词、记下一个想法，留下原文与位置，再带着上下文回顾或与 Agent 继续讨论。
 
-[开始使用](docs/installation.md) · [与 Agent 一起学习](skills/SKILL.md)
+[交给你的 Agent：安装、配置与学习](skills/SKILL.md)
 
 ## 在原文旁，留下理解
 
@@ -38,7 +38,11 @@
 
 当前为桌面 Chrome 早期开发版，需从源码安装并配置自己的服务密钥；仓库访问需授权。学习资料存于本机，字幕与翻译会调用第三方服务。手机 Chrome 暂不支持。
 
-[安装与配置](docs/installation.md) · [Agent Skill](skills/SKILL.md) · [隐私与数据](PRIVACY.md)
+把下面这段话交给能操作本机的 Agent：
+
+> 请读取 https://github.com/xiaoji714/marginway-learning/blob/main/skills/SKILL.md ，按 Skill 帮我安装、配置并验证 Marginway；已有安装请沿用，需要我操作时逐步引导。
+
+[Marginway Skill](skills/SKILL.md) · [手动安装指南](docs/installation.md) · [隐私与数据](PRIVACY.md)
 
 [开发与贡献](CONTRIBUTING.md) · [工程架构与测试](docs/engineering.md) · [版本与发布](docs/releases.md) · [安装体验设计](docs/runtime-installation-design.md)
 
