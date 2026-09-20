@@ -352,7 +352,7 @@ async function noteCard(item: any) {
   );
   const actions = el("div", null, "actions");
   const discuss = button("在 Agent 中讨论", () =>
-    copyContext(item.anchorId, card).catch(error),
+    copyContext(item, card).catch(error),
   );
   discuss.title = "复制上下文，粘贴到 Agent 中继续讨论";
   actions.append(discuss);
@@ -807,10 +807,18 @@ async function render() {
     lastRenderKey = key;
   }
 }
-async function copyContext(anchorId: any, container: any) {
+async function copyContext(note: any, container: any) {
+  const anchorId = note.anchorId;
   const d = await api("discussions.create", {
     anchorId,
-    question: "继续讨论这条笔记及其原文",
+    ...(note.kind === "note"
+      ? { noteId: note.id, question: "继续讨论这条笔记及其原文" }
+      : {
+          selected: note.word,
+          selectionTranslation: note.meaning,
+          question: `我想理解“${note.word}”在这处语境中的含义`,
+        }),
+    operationId: crypto.randomUUID(),
   });
   const x = await api("context.export", { anchorId, discussionId: d.id });
   if (await LC.clipboard(x.prompt, container))
