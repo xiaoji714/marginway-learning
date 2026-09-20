@@ -62,6 +62,8 @@ if (target !== join(media, "extension")) {
 const runtime = join(home, ".local/share/learning-companion/runtime");
 mkdirSync(runtime, { recursive: true, mode: 0o700 });
 cpSync(join(media, "runtime"), runtime, { recursive: true });
+const skillPath = join(runtime, "skills");
+cpSync(join(media, "skills"), skillPath, { recursive: true });
 const quote = (s: string) => "'" + s.replaceAll("'", "'\\''") + "'";
 const bin = join(home, ".local/bin");
 mkdirSync(bin, { recursive: true });
@@ -133,5 +135,5 @@ if (win && !args.includes("--skip-registration")) {
   if (p.status) throw new Error("Native host registration failed");
 }
 console.log(
-  `Extension: ${target}\nCLI: ${cli}\nNative host: ${manifest}\nReload the extension and refresh open pages.`,
+  `Extension: ${target}\nCLI: ${cli}\nSkill: ${join(skillPath, "SKILL.md")}\nNative host: ${manifest}\nReload the extension and refresh open pages.`,
 );

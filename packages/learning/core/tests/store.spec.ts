@@ -1,4 +1,4 @@
-import { test } from "vitest";
+import { test, expect } from "vitest";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -571,4 +571,32 @@ test("resource deletion cancels queued work and rejects late completions without
     "restoring must not restart cancelled requests",
   );
   assert.equal(run("anchors.list", { resourceId: r.id }).total, 1);
+});
+
+test("explicit relayed user review counts as activity without changing agent provenance", (t) => {
+  const { s } = fixture(t);
+  const r = s.execute("resources.upsert", {
+    url: "https://example.com/feedback",
+  });
+  const a = s.execute("anchors.upsert", { resourceId: r.id, quote: "context" });
+  const v = s.execute("vocabulary.save", {
+    anchorId: a.id,
+    word: "context",
+  }).vocabulary;
+  expect(() =>
+    s.execute("reviews.record", {
+      vocabularyId: v.id,
+      rating: "good",
+      feedbackSource: "automatic",
+    }),
+  ).toThrow();
+  const review = s.execute("reviews.record", {
+    vocabularyId: v.id,
+    rating: "good",
+    feedbackSource: "user-confirmed",
+  });
+  expect(review.origin).toBe("agent");
+  expect(s.execute("activity.list").items.map((x: any) => x.id)).toContain(
+    review.id,
+  );
 });
