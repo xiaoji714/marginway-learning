@@ -13,3 +13,7 @@ Phosphor Icons，MIT。许可见 `apps/extension/public/icons/PHOSPHOR-LICENSE`�
 ## 开发依赖
 
 具体版本与依赖树以 pnpm-lock.yaml 为准。TypeScript、pnpm、Vitest、esbuild、jsdom、fflate、Lefthook 等按各自许可证使用；发布的 Node 业务入口无 npm 运行时依赖，SQLite 来自 Node。
+
+## 产品运行截图
+
+README 的 `docs/assets/product-video.png` 由维护者提供，用于展示扩展在 YouTube 的运行方式。画面中的视频来自 [Dwarkesh Podcast](https://www.youtube.com/watch?v=6AgOfiZOWiY)；视频画面及 YouTube 标识的权利属于各自权利人，不由本项目 MIT 许可证重新授权。

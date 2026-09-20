@@ -12,6 +12,14 @@
 
 <img src="docs/assets/product-card.png" width="960" alt="语境卡片：查看 context 的释义与原句、收藏词汇、记录想法，并在 Agent 中讨论">
 
+## 看视频时，字幕就在视线旁
+
+视频下方显示当前句的双语字幕，侧栏保留前后文并跟随播放。需要理解一个词或记下想法时，就从字幕开始；点击时间点回到原处，也可以重播当前句。
+
+<img src="docs/assets/product-video.png" width="960" alt="实际运行：YouTube 视频下方显示当前句双语字幕，右侧字幕列表跟随播放，提供划词、笔记和回溯入口">
+
+<sub>实际使用截图，由维护者提供。视频：[Dwarkesh Podcast · OpenAI researcher on agent swarms & recursive self-improvement](https://www.youtube.com/watch?v=6AgOfiZOWiY)。</sub>
+
 ## 回到材料，继续学习
 
 同一份资源下的词汇和笔记聚在一起。用分类和搜索找到材料，回到原文或视频时间点；通过词汇复习和学习热力图回看自己的积累。
@@ -24,7 +32,7 @@
 
 **阅读 / 看视频 → 划词与想法 → 保留语境 → 资料库 → 回顾原文 → 延续讨论**
 
-<sub>以上为当前产品组件的实际截图，使用合成演示资料；[截图规范与复现](docs/engineering.md#产品截图)。</sub>
+<sub>语境卡片和资料库图使用合成演示资料，视频图为实际运行截图；[截图规范与复现](docs/engineering.md#产品截图)。</sub>
 
 ## 开始与了解
 
