@@ -383,3 +383,111 @@ test("activity lists only human captures, new notes and reviews, never edits, im
   expect(first.items[0].text).toBeUndefined();
   expect(run("activity.list", { resourceId: "missing" }).total).toBe(0);
 });
+
+test("discussion handoff is bounded while full selection, question and focused note remain retrievable", (t) => {
+  const { run, r } = fixture(t);
+  const a = run("anchors.upsert", {
+    resourceId: r.id,
+    quote: "原文😀".repeat(1000),
+    start: 314,
+  });
+  const note = run("notes.append", {
+    anchorId: a.id,
+    text: "当前想法".repeat(1000),
+  });
+  run("notes.append", { anchorId: a.id, text: "不要泄漏的其他笔记" });
+  const question = "我的长问题".repeat(500);
+  const d = run("discussions.create", {
+    anchorId: a.id,
+    noteId: note.id,
+    question,
+    selected: "词语".repeat(500),
+    selectionTranslation: "很长的译文".repeat(500),
+  });
+  const { prompt, context } = run("context.export", {
+    anchorId: a.id,
+    discussionId: d.id,
+  });
+  expect(Array.from(prompt).length).toBeLessThan(2000);
+  expect(prompt).toContain("〔节选〕");
+  expect(prompt).toContain("5:14");
+  expect(prompt).toContain("&t=314s");
+  for (const id of [a.id, d.id, note.id]) expect(prompt).toContain(id);
+  for (const absent of [
+    "不要泄漏的其他笔记",
+    "createdBy",
+    "revision",
+    "很长的译文",
+    "notes.append",
+    '"resource":',
+  ])
+    expect(prompt).not.toContain(absent);
+  expect(context.focusedNote.text).toBe(note.text);
+  expect(context.notes).toHaveLength(2);
+  expect(run("records.get", { id: d.id }).question).toBe(question);
+  expect(context.discussion.selected).toBe(d.selected);
+  expect(context.discussion.selectionTranslation).toBe(d.selectionTranslation);
+});
+
+test("note focus rejects invalid, mismatched and deleted references without creating discussions", (t) => {
+  const { run, r, a } = fixture(t);
+  const b = run("anchors.upsert", { resourceId: r.id, quote: "Other" });
+  const n = run("notes.append", { anchorId: b.id, text: "Wrong focus" });
+  for (const noteId of ["", 42, r.id, n.id, "missing"])
+    expect(() =>
+      run("discussions.create", { anchorId: a.id, noteId }),
+    ).toThrow();
+  expect(
+    run("export").objects.filter((x) => x.kind === "discussion"),
+  ).toHaveLength(0);
+  const own = run("notes.append", { anchorId: a.id, text: "Own" });
+  const d = run("discussions.create", { anchorId: a.id, noteId: own.id });
+  run("records.setDeleted", {
+    id: own.id,
+    expectedRevision: own.revision,
+    deleted: true,
+  });
+  expect(() =>
+    run("discussions.create", { anchorId: a.id, noteId: own.id }),
+  ).toThrow(/删除/);
+  expect(() =>
+    run("context.export", { anchorId: a.id, discussionId: d.id }),
+  ).toThrow(/删除/);
+});
+
+test("short handoffs preserve sentence focus, agent provenance and web sources without timestamps", (t) => {
+  const { run, store } = fixture(t);
+  const r = run("resources.upsert", {
+    url: "https://example.com/" + "x".repeat(400),
+    title: "标题".repeat(100),
+  });
+  const a = run("anchors.upsert", { resourceId: r.id, quote: "A sentence." });
+  const n = store.execute("notes.append", {
+    anchorId: a.id,
+    text: "Agent thought",
+  });
+  const d = run("discussions.create", {
+    anchorId: a.id,
+    noteId: n.id,
+    selected: a.quote,
+  });
+  const x = run("context.export", { anchorId: a.id, discussionId: d.id });
+  expect(x.prompt).toContain("Agent 生成");
+  expect(x.prompt).not.toContain("选中内容：");
+  expect(x.prompt).not.toContain(r.url);
+  expect(x.prompt).not.toContain("位置：");
+  expect(x.context.resource.url).toBe(r.url);
+  const legacy = run("context.export", { anchorId: a.id });
+  expect(legacy.prompt).toContain("Skill");
+  expect(legacy.context.focusedNote).toBeNull();
+  expect(legacy.prompt).not.toContain("Agent thought");
+  const emptySelection = run("discussions.create", {
+    anchorId: a.id,
+    selected: "",
+    question: "Why?",
+  });
+  expect(
+    run("context.export", { anchorId: a.id, discussionId: emptySelection.id })
+      .prompt,
+  ).toContain("Why?");
+});
