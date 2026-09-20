@@ -12,7 +12,9 @@ export function createResources(
         id = "r_" + hash(url),
         prev = maybe(id);
       result =
-        prev ||
+        (prev?.archived
+          ? save("resource", { ...prev, archived: false }, actor, id)
+          : prev) ||
         save(
           "resource",
           {
@@ -30,6 +32,20 @@ export function createResources(
         );
 
       return result;
+    },
+    "resources.setArchived": (p, actor) => {
+      const r = resourceFor(p.id, true);
+      if (typeof p.archived !== "boolean") fail("archived 必须为布尔值");
+      if (r.revision !== p.expectedRevision)
+        fail("资源已更新，请重新读取", "CONFLICT");
+      if (
+        p.archived &&
+        db
+          .prepare("SELECT 1 FROM objects WHERE resource_id=? LIMIT 1")
+          .get(r.id)
+      )
+        fail("仅允许归档没有关联记录的空资源");
+      return save("resource", { ...r, archived: p.archived }, actor, r.id);
     },
     "resources.update": (p, actor) => {
       let result;

@@ -296,3 +296,90 @@ test("backup merges new records atomically, checks references and keeps existing
   expect(() => run("records.get", { id: bad.id })).toThrow();
   expect(store.version()).toBeGreaterThan(0);
 });
+
+test("empty resource archive is reversible, audited, and rejects linked records or stale requests", (t) => {
+  const { run, r } = fixture(t);
+  const empty = run("resources.upsert", {
+    url: "https://www.youtube.com/",
+    title: "Stale video title",
+  });
+  expect(() =>
+    run("resources.setArchived", {
+      id: empty.id,
+      expectedRevision: 1,
+      archived: "yes",
+    }),
+  ).toThrow();
+  expect(() =>
+    run("resources.setArchived", {
+      id: empty.id,
+      expectedRevision: 9,
+      archived: true,
+    }),
+  ).toThrow(/重新读取/);
+  expect(() =>
+    run("resources.setArchived", {
+      id: r.id,
+      expectedRevision: r.revision,
+      archived: true,
+    }),
+  ).toThrow(/关联/);
+  const archived = run("resources.setArchived", {
+    id: empty.id,
+    expectedRevision: 1,
+    archived: true,
+  });
+  expect(run("resources.list").items.map((x) => x.id)).toEqual([r.id]);
+  expect(run("stats").resource).toBe(1);
+  expect(run("resources.list", { includeArchived: true }).total).toBe(2);
+  expect(run("search", { query: "Stale" }).total).toBe(0);
+  expect(run("records.get", { id: empty.id }).archived).toBe(true);
+  expect(() =>
+    run("anchors.upsert", {
+      resourceId: empty.id,
+      quote: "Must not become hidden data",
+    }),
+  ).toThrow(/先恢复/);
+  expect(() =>
+    run("jobs.submit", { resourceId: empty.id, type: "transcript" }),
+  ).toThrow(/先恢复/);
+  expect(run("anchors.list", { resourceId: empty.id }).total).toBe(0);
+  const restored = run("resources.setArchived", {
+    id: empty.id,
+    expectedRevision: archived.revision,
+    archived: false,
+  });
+  expect(run("stats").resource).toBe(2);
+  run("resources.setArchived", {
+    id: empty.id,
+    expectedRevision: restored.revision,
+    archived: true,
+  });
+  expect(run("resources.upsert", { url: empty.url }).archived).toBe(false);
+  expect(run("records.history", { id: empty.id })).toHaveLength(5);
+});
+test("activity lists only human captures, new notes and reviews, never edits, imports-as-new or background jobs", (t) => {
+  const { run, store, r, a } = fixture(t);
+  const n = run("notes.append", { anchorId: a.id, text: "Thought" });
+  run("notes.update", {
+    id: n.id,
+    expectedRevision: n.revision,
+    text: "Edited thought",
+  });
+  const v = run("vocabulary.save", { anchorId: a.id, word: "context" });
+  run("vocabulary.save", { anchorId: a.id, word: "context" });
+  run("reviews.record", { vocabularyId: v.vocabulary.id, rating: "good" });
+  store.execute("notes.append", { anchorId: a.id, text: "Agent analysis" });
+  run("jobs.submit", { resourceId: r.id, type: "transcript" });
+  const first = run("activity.list", { limit: 2 });
+  const second = run("activity.list", { limit: 2, offset: first.next });
+  expect(first.total).toBe(3);
+  expect([...first.items, ...second.items].map((x) => x.kind).sort()).toEqual([
+    "note",
+    "occurrence",
+    "review",
+  ]);
+  expect(second.next).toBe(null);
+  expect(first.items[0].text).toBeUndefined();
+  expect(run("activity.list", { resourceId: "missing" }).total).toBe(0);
+});

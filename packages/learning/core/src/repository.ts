@@ -68,9 +68,10 @@ export function openRepository(file: string) {
     );
     return obj;
   };
-  const resourceFor = (id: string) => {
+  const resourceFor = (id: string, includeArchived = false) => {
     const r = get(id);
     if (r.kind !== "resource") fail("需要资源 ID");
+    if (r.archived && !includeArchived) fail("资源已归档，请先恢复");
     return r;
   };
   const anchorFor = (id: string) => {

@@ -173,6 +173,7 @@ async function pageRpc({
   currentUrl,
   requestedUrl,
   frameId = 0,
+  knownResource = true,
   params,
   command = "resources.upsert",
 }) {
@@ -189,6 +190,17 @@ async function pageRpc({
         result = {
           id: new URL(m.params.url).searchParams.get("v") || "web",
           url: m.params.url,
+        };
+      if (m.command === "resources.list")
+        result = {
+          items: knownResource
+            ? [
+                {
+                  id: new URL(currentUrl).searchParams.get("v") || "web",
+                  url: m.params.query,
+                },
+              ]
+            : [],
         };
       queueMicrotask(() => nativeListener({ id: m.id, ok: true, result }));
     },
@@ -290,6 +302,32 @@ test("same video ID on another origin and subframe cannot bypass page resource i
         requestedUrl: base.currentUrl,
       })
     ).response.ok,
+    false,
+  );
+});
+
+test("resource authorization reads never create a homepage during stale video requests", async () => {
+  const moved = await pageRpc({
+    documentUrl: "https://www.youtube.com/watch?v=videoAAAAAA",
+    currentUrl: "https://www.youtube.com/",
+    command: "anchors.list",
+    params: { resourceId: "videoAAAAAA" },
+    knownResource: false,
+  });
+  assert.equal(moved.response.ok, false);
+  assert.equal(
+    moved.writes.some((m) => m.command === "resources.upsert"),
+    false,
+  );
+  const same = await pageRpc({
+    documentUrl: "https://www.youtube.com/",
+    currentUrl: "https://www.youtube.com/watch?v=videoBBBBBB",
+    command: "anchors.list",
+    params: { resourceId: "videoBBBBBB" },
+  });
+  assert.equal(same.response.ok, true, same.response.error);
+  assert.equal(
+    same.writes.some((m) => m.command === "resources.upsert"),
     false,
   );
 });
