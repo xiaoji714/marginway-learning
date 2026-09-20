@@ -104,7 +104,22 @@ export function createVocabulary(
           : p.rating === "hard"
             ? 1
             : Math.max(2, (v.intervalDays || 1) * 2);
-      result = save("review", { vocabularyId: v.id, rating: p.rating }, actor);
+      if (
+        p.feedbackSource !== undefined &&
+        p.feedbackSource !== "user-confirmed"
+      )
+        fail("feedbackSource 必须是 user-confirmed");
+      result = save(
+        "review",
+        {
+          vocabularyId: v.id,
+          rating: p.rating,
+          ...(p.feedbackSource === "user-confirmed"
+            ? { feedbackSource: p.feedbackSource }
+            : {}),
+        },
+        actor,
+      );
       save(
         "vocabulary",
         {

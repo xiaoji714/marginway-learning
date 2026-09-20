@@ -28,9 +28,9 @@ pnpm run package
 node runtime/install.js --extension-id <扩展ID> --extension-dir "<Chrome加载目录的完整路径>"
 ```
 
-安装器输出 Extension、CLI 和 Native host 的准确路径。核对 Extension 与 Chrome 的目录相同。需要位置建议时，可选 macOS/Linux 的 `~/Documents/marginway-learning` 或 Windows 的 `%USERPROFILE%\Documents\marginway-learning`，它们不是固定要求。
+安装器输出 Extension、CLI、Skill 和 Native host 的准确路径。核对 Extension 与 Chrome 的目录相同。需要位置建议时，可选 macOS/Linux 的 `~/Documents/marginway-learning` 或 Windows 的 `%USERPROFILE%\Documents\marginway-learning`，它们不是固定要求。
 
-安装器将桥接与 CLI 复制到独立 runtime。请保留安装时使用的 Node：当前桥接仍引用它的可执行文件。CLI 默认位于 macOS/Linux 的 `~/.local/bin/learning`，Windows 的 `%USERPROFILE%\.local\bin\learning.cmd`；可以直接运行完整路径，不必先修改 PATH。
+安装器将桥接与 CLI 复制到独立 runtime。请保留安装时使用的 Node：当前桥接仍引用它的可执行文件。CLI 默认位于 macOS/Linux 的 `~/.local/bin/learning`，Windows 的 `%USERPROFILE%\.local\bin\learning.cmd`；可以直接运行完整路径，不必先修改 PATH。运行该 CLI 的 `skill` 命令即可取得持久保存的 Skill 路径与正文；让 Agent 读取，或用其支持的 Skill 安装方式接入该目录。无需保留源码或解压包，也不会自动修改其他 Agent 的配置。
 
 ## 配置与第一条记录
 

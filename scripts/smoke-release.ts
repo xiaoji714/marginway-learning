@@ -107,6 +107,10 @@ try {
   assert(!existsSync(join(dir, "obsolete.js")));
   rmSync(join(temp, "media"), { recursive: true });
   assert.equal(run("resources.list").items[0].id, r.id);
+  assert.equal(run("--version").version, version);
+  assert.match(run("skill").content, /Marginway/);
+  assert(existsSync(run("skill").path));
+  assert.match(installed.stdout, /Skill:/);
   const info = JSON.parse(strFromU8(entries["build-info.json"]!));
   assert.equal(info.version, version);
   assert.match(info.commit, /^[a-f0-9]{40}$/);
