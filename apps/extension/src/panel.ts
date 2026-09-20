@@ -36,7 +36,7 @@ async function load(fetchCaptions = true) {
   if (gen !== generation) return;
   tab = targetTab;
   refreshSequence++;
-  if (!/^https?:/.test(targetTab?.url || ""))
+  if (!targetTab?.url || !/^https?:/.test(targetTab.url))
     throw new Error("请打开 YouTube 视频或普通网页");
   const currentUrl = new URL(targetTab.url);
   if (
