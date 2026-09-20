@@ -121,6 +121,7 @@ try {
   assert.equal(run("--version").version, version);
   assert.match(run("skill").content, /Marginway/);
   assert(existsSync(run("skill").path));
+  assert(existsSync(join(dirname(run("skill").path), "references/usage.md")));
   assert.match(installed.stdout, /Skill:/);
   const info = JSON.parse(strFromU8(entries["build-info.json"]!));
   assert.equal(info.version, version);
