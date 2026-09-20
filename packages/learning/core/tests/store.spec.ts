@@ -178,3 +178,155 @@ test("playback actions are repeatable commands, not cached results", (t) => {
     ),
   );
 });
+
+test("word corrections preserve IDs, contexts, reviews and creation provenance without breaking future saves", (t) => {
+  const { s, r, a } = fixture(t);
+  const run = (cmd, params = {}, actor = human) =>
+    s.execute(cmd, params, actor);
+  const first = run("vocabulary.save", {
+    anchorId: a.id,
+    word: "contex",
+    meaning: "语境",
+  });
+  const b = run("anchors.upsert", {
+    resourceId: r.id,
+    quote: "A second context",
+  });
+  run("vocabulary.save", { anchorId: b.id, word: "contex", meaning: "上下文" });
+  run("vocabulary.save", { anchorId: b.id, word: "other", language: "fr" });
+  const other = run("vocabulary.save", { anchorId: b.id, word: "taken" });
+  const review = run("reviews.record", {
+    vocabularyId: first.vocabulary.id,
+    rating: "good",
+  });
+  const v = run("records.get", { id: first.vocabulary.id });
+  for (const [params, message] of [
+    [{ id: r.id, word: "x", expectedRevision: 1 }, /需要词条/],
+    [{ id: v.id, word: "x", expectedRevision: 1 }, /词条已更新/],
+    [{ id: v.id, word: "  ", expectedRevision: v.revision }, /不能为空/],
+    [{ id: v.id, word: "TAKEN", expectedRevision: v.revision }, /已存在/],
+  ])
+    assert.throws(() => run("vocabulary.update", params), message);
+  const beforeActivity = run("activity.list").total;
+  const corrected = run(
+    "vocabulary.update",
+    {
+      id: v.id,
+      word: "context",
+      expectedRevision: v.revision,
+      operationId: "correct-word",
+    },
+    agent,
+  );
+  assert.equal(corrected.id, v.id);
+  assert.equal(corrected.dueAt, v.dueAt);
+  assert.equal(corrected.createdAt, v.createdAt);
+  assert.deepEqual(corrected.createdBy, human);
+  assert.deepEqual(corrected.editedBy, agent);
+  assert.equal(corrected.origin, "human");
+  assert.equal(run("records.get", { id: review.id }).vocabularyId, v.id);
+  const occurrences = run("occurrences.list", { vocabularyId: v.id }).items;
+  assert.equal(occurrences.length, 2);
+  assert.ok(occurrences.every((o) => o.word === "context"));
+  const occurrence = run("records.get", { id: first.occurrence.id });
+  assert.equal(occurrence.anchorId, a.id);
+  assert.equal(occurrence.createdAt, first.occurrence.createdAt);
+  assert.equal(run("records.get", { id: a.id }).quote, a.quote);
+  assert.equal(
+    run("vocabulary.save", { anchorId: a.id, word: "context" }).occurrence.id,
+    occurrence.id,
+  );
+  const old = run("vocabulary.save", { anchorId: a.id, word: "contex" });
+  assert.notEqual(old.vocabulary.id, v.id);
+  assert.equal(old.vocabulary.word, "contex");
+  assert.equal(run("records.get", { id: v.id }).word, "context");
+  assert.throws(
+    () =>
+      run("occurrences.update", {
+        id: r.id,
+        expectedRevision: 1,
+        meaning: "x",
+      }),
+    /需要词汇语境/,
+  );
+  assert.throws(
+    () =>
+      run("occurrences.update", {
+        id: occurrence.id,
+        expectedRevision: 1,
+        meaning: "x",
+      }),
+    /释义已更新/,
+  );
+  const params = {
+    id: occurrence.id,
+    expectedRevision: occurrence.revision,
+    meaning: "具体语境",
+    operationId: "meaning",
+  };
+  const changed = run("occurrences.update", params, agent);
+  assert.deepEqual(run("occurrences.update", params, agent), changed);
+  assert.equal(changed.meaning, "具体语境");
+  assert.equal(changed.word, "context");
+  assert.equal(
+    run("occurrences.list", { vocabularyId: v.id }).items.find(
+      (o) => o.id !== changed.id,
+    ).meaning,
+    "上下文",
+  );
+  assert.equal(run("activity.list").total, beforeActivity + 1);
+  assert.equal(run("records.history", { id: changed.id }).length, 3);
+  assert.equal(run("records.get", { id: other.vocabulary.id }).word, "taken");
+  // Case-only correction keeps canonical vocabulary identity but may leave the original hash occupied.
+  const upper = run("vocabulary.update", {
+    id: v.id,
+    expectedRevision: corrected.revision,
+    word: "CONTEXT",
+  });
+  const recaptured = run("vocabulary.save", {
+    anchorId: a.id,
+    word: "context",
+  });
+  assert.equal(recaptured.vocabulary.id, upper.id);
+  assert.notEqual(recaptured.occurrence.id, changed.id);
+  const refreshed = run("records.get", { id: recaptured.occurrence.id });
+  run("occurrences.update", {
+    id: refreshed.id,
+    expectedRevision: refreshed.revision,
+  });
+  assert.equal(run("records.get", { id: refreshed.id }).meaning, "");
+});
+
+test("case correction can recapture the original spelling without overwriting occurrence history", (t) => {
+  const { s, a } = fixture(t);
+  const original = s.execute(
+    "vocabulary.save",
+    { anchorId: a.id, word: "shape", meaning: "Original" },
+    human,
+  );
+  s.execute(
+    "vocabulary.update",
+    { id: original.vocabulary.id, expectedRevision: 1, word: "SHAPE" },
+    human,
+  );
+  const next = s.execute(
+    "vocabulary.save",
+    { anchorId: a.id, word: "shape", meaning: "New capture" },
+    human,
+  );
+  assert.equal(next.vocabulary.id, original.vocabulary.id);
+  assert.notEqual(next.occurrence.id, original.occurrence.id);
+  assert.equal(
+    s.execute("records.get", { id: original.occurrence.id }).word,
+    "SHAPE",
+  );
+  assert.equal(
+    s.execute("records.get", { id: original.occurrence.id }).meaning,
+    "Original",
+  );
+  assert.equal(
+    s.execute("vocabulary.save", { anchorId: a.id, word: "shape" }, human)
+      .occurrence.id,
+    next.occurrence.id,
+  );
+});
