@@ -769,3 +769,185 @@ test("selection card expresses saved state on the button and removes duplicate c
   assert.equal(card.querySelector(".lc-source"), null);
   card.dispose();
 });
+
+test("learning heatmap uses 365 local calendar days, paginated records and clickable day counts", async (t) => {
+  const dom = new JSDOM(
+    readFileSync("apps/extension/lib/library.html", "utf8"),
+    { url: "https://example.com", runScripts: "outside-only" },
+  );
+  const w = dom.window;
+  t.onTestFinished(() => w.close());
+  w.Date = class extends Date {
+    constructor(...args) {
+      super(...(args.length ? args : [2024, 2, 1, 12]));
+    }
+  };
+  const events = [
+    ...["note", "review", "occurrence"].map((kind) => ({
+      kind,
+      createdAt: "2024-03-01T00:30:00",
+    })),
+    ...Array.from({ length: 10 }, () => ({
+      kind: "review",
+      createdAt: "2024-02-29T23:30:00",
+    })),
+    { kind: "note", createdAt: "2025-01-01" },
+    { kind: "note", createdAt: "2022-01-01" },
+    { kind: "note", createdAt: "invalid" },
+  ];
+  const offsets = [];
+  w.chrome = {
+    runtime: {
+      connect: () => ({ onMessage: { addListener() {} } }),
+      sendMessage: async (m) => {
+        if (m.command === "activity.list") offsets.push(m.params.offset);
+        return {
+          ok: true,
+          result:
+            m.command === "stats"
+              ? { note: 1 }
+              : m.command === "activity.list"
+                ? {
+                    items:
+                      m.params.offset === 0
+                        ? events.slice(0, 3)
+                        : events.slice(3),
+                    next: m.params.offset === 0 ? 200 : null,
+                  }
+                : { items: [], next: null },
+        };
+      },
+    },
+  };
+  w.eval(script("common"));
+  w.eval(script("library"));
+  await pause(10);
+  w.document.querySelector('[data-view="stats"]').click();
+  await pause(20);
+  const cells = [...w.document.querySelectorAll(".activity-day")];
+  assert.equal(cells.length, 365);
+  assert.equal(new Set(cells.map((x) => x.dataset.date)).size, 365);
+  assert.equal(cells.at(-1).dataset.date, "2024-03-01");
+  assert.deepEqual(offsets, [0, 200]);
+  const today = cells.at(-1);
+  assert.equal(today.dataset.level, "2");
+  today.click();
+  assert.match(
+    w.document.querySelector(".activity-detail").textContent,
+    /收藏词句 1 · 笔记 1 · 复习 1/,
+  );
+  assert.equal(
+    w.document.querySelector('[data-date="2024-02-29"]').dataset.level,
+    "4",
+  );
+  assert.match(
+    w.document.querySelector(".activity-section").textContent,
+    /13 条记录 · 2 个活跃日/,
+  );
+  cells[0].click();
+  assert.equal(today.getAttribute("aria-pressed"), "false");
+  assert.match(
+    w.document.querySelector(".activity-detail").textContent,
+    /收藏词句 0 · 笔记 0 · 复习 0/,
+  );
+});
+
+test("YouTube homepage with stale video title is not auto-registered by page polling or sidebar", async (t) => {
+  for (const entry of ["page", "panel"]) {
+    const dom = new JSDOM(
+      entry === "panel"
+        ? readFileSync("apps/extension/lib/panel.html", "utf8")
+        : "<title>Old video title</title><body></body>",
+      { url: "https://www.youtube.com/", runScripts: "outside-only" },
+    );
+    const w = dom.window;
+    t.onTestFinished(() => w.close());
+    let tick;
+    const requests = [];
+    w.setInterval = (fn) => (tick = fn);
+    w.chrome = {
+      runtime: {
+        connect: () => ({ onMessage: { addListener() {} } }),
+        onMessage: { addListener() {} },
+        sendMessage: async (m) => {
+          requests.push(m);
+          return { ok: true, result: { items: [], next: null } };
+        },
+      },
+      tabs: {
+        query: async () => [
+          { id: 1, url: w.location.href, title: "Old video title" },
+        ],
+      },
+    };
+    w.eval(script("common"));
+    w.eval(script(entry));
+    await pause(10);
+    await tick();
+    await pause(10);
+    assert.equal(
+      requests.some((m) => m.command === "resources.upsert"),
+      false,
+      entry,
+    );
+    if (entry === "panel")
+      assert.match(
+        w.document.getElementById("status").textContent,
+        /不会自动加入/,
+      );
+  }
+});
+
+test("late video registration cannot overwrite sidebar after navigation to YouTube home", async (t) => {
+  const dom = new JSDOM(readFileSync("apps/extension/lib/panel.html", "utf8"), {
+    url: "https://example.com",
+    runScripts: "outside-only",
+  });
+  const w = dom.window;
+  t.onTestFinished(() => w.close());
+  let tick, finish;
+  let url = "https://www.youtube.com/watch?v=abcdefghijk";
+  const requests = [];
+  w.setInterval = (fn) => (tick = fn);
+  w.chrome = {
+    runtime: {
+      connect: () => ({ onMessage: { addListener() {} } }),
+      sendMessage: async (m) => {
+        requests.push(m);
+        return {
+          ok: true,
+          result:
+            m.command === "resources.upsert"
+              ? await new Promise((r) => (finish = r))
+              : { items: [], next: null },
+        };
+      },
+    },
+    tabs: { query: async () => [{ id: 1, url, title: "Video title" }] },
+  };
+  w.eval(script("common"));
+  w.eval(script("panel"));
+  await pause(10);
+  url = "https://www.youtube.com/";
+  await tick();
+  finish({
+    id: "r",
+    type: "video",
+    url: "https://www.youtube.com/watch?v=abcdefghijk",
+    title: "Old title",
+  });
+  await pause(10);
+  assert.match(
+    w.document.getElementById("title").textContent,
+    /打开一个 YouTube 视频/,
+  );
+  assert.equal(
+    requests.filter((m) => m.command === "resources.upsert").length,
+    1,
+  );
+  assert.equal(
+    requests.some((m) => m.command === "jobs.submit"),
+    false,
+  );
+  assert.equal(w.document.getElementById("translation-progress").hidden, true);
+});

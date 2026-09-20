@@ -9,6 +9,7 @@ export const caps = {
     },
     "resources.list": {
       query: "optional",
+      includeArchived: "optional boolean",
       offset: "integer",
       limit: "1..200",
     },
@@ -72,6 +73,17 @@ export const caps = {
     "context.export": { anchorId: "ID", discussionId: "optional" },
     search: { query: "text", offset: "integer", limit: "1..200" },
     stats: {},
+    "activity.list": {
+      offset: "integer",
+      limit: "1..200",
+      description:
+        "Human-created occurrence/note/review events; use createdAt in the viewer timezone",
+    },
+    "resources.setArchived": {
+      id: "resource ID",
+      expectedRevision: "integer",
+      archived: "boolean; archiving requires empty resource",
+    },
     export: {},
     "jobs.submit": {
       type: "transcript|translate|lookup|seek",
