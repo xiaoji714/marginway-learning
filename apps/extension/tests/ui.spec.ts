@@ -178,7 +178,7 @@ test("under-video captions follow playback, mount once and seek to captured node
 });
 test("resource detail survives database notifications and shows agent provenance", async (t) => {
   const dom = new JSDOM(
-      '<body><input id="query"><div id="status"></div><div id="content"></div><button id="search"></button><button id="settings"></button><button id="export"></button><button data-view="resources.list"></button></body>',
+      '<body><nav id="breadcrumbs"></nav><input id="query"><div id="status"></div><div id="content"></div><button id="search"></button><button id="settings"></button><button id="export"></button><button data-view="resources.list"></button></body>',
       { url: "https://example.com", runScripts: "outside-only" },
     ),
     w = dom.window;
@@ -242,8 +242,8 @@ test("resource detail survives database notifications and shows agent provenance
     /Agent 生成 · Codex/,
   );
   assert.match(
-    w.document.getElementById("content").textContent,
-    /返回全部资源/,
+    w.document.getElementById("breadcrumbs").textContent,
+    /资料库全部资源资源记录/,
   );
 });
 test("deferred mouse selection preserves shadow path and does not reopen an active card", async (t) => {
@@ -959,4 +959,202 @@ test("late video registration cannot overwrite sidebar after navigation to YouTu
     false,
   );
   assert.equal(w.document.getElementById("translation-progress").hidden, true);
+});
+
+test("library edits resources, words, context meanings and notes through the store and keeps navigation separate", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "lc-edit-ui-"));
+  const store = openStore(join(dir, "db"));
+  const human = { origin: "human", id: "chrome-ui", name: "用户" };
+  const run = (cmd, params = {}) => store.execute(cmd, params, human);
+  const r = run("resources.upsert", {
+    url: "https://example.com/learning",
+    title: "Source",
+  });
+  const a = run("anchors.upsert", {
+    resourceId: r.id,
+    quote: "Original context",
+  });
+  const { vocabulary: v, occurrence: o } = run("vocabulary.save", {
+    anchorId: a.id,
+    word: "contex",
+    meaning: "旧释义",
+  });
+  const n = run("notes.append", { anchorId: a.id, text: "Old note" });
+  const dom = new JSDOM(
+    readFileSync("apps/extension/lib/library.html", "utf8"),
+    { url: "https://example.com", runScripts: "outside-only" },
+  );
+  const w = dom.window;
+  t.onTestFinished(() => {
+    w.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const lostResponses = new Set([
+    "resources.update",
+    "vocabulary.update",
+    "occurrences.update",
+    "notes.update",
+  ]);
+  const attempts = new Map();
+  w.chrome = {
+    runtime: {
+      connect: () => ({ onMessage: { addListener() {} } }),
+      sendMessage: async (m) => {
+        try {
+          const result = run(m.command, m.params);
+          if (lostResponses.delete(m.command)) {
+            attempts.set(m.command, m.params.operationId);
+            return { ok: false, error: "模拟响应丢失" };
+          }
+          if (attempts.has(m.command)) {
+            assert.equal(m.params.operationId, attempts.get(m.command));
+            attempts.delete(m.command);
+          }
+          return { ok: true, result };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      },
+    },
+  };
+  w.eval(script("common"));
+  w.eval(script("library"));
+  const click = (text, scope = w.document) => {
+    const b = [...scope.querySelectorAll("button")].find(
+      (b) => b.textContent === text,
+    );
+    assert.ok(b, text);
+    b.click();
+  };
+  const field = (label, value) => {
+    w.document.querySelector(`dialog [aria-label="${label}"]`).value = value;
+  };
+  const save = async () => {
+    click("保存", w.document.querySelector("dialog"));
+    await pause(30);
+    if (
+      w.document
+        .querySelector("dialog [role=status]")
+        ?.textContent.includes("模拟响应丢失")
+    ) {
+      click("保存", w.document.querySelector("dialog"));
+      await pause(30);
+      assert.equal(
+        w.document.querySelector("dialog"),
+        null,
+        "unchanged retries reuse the committed operation",
+      );
+    }
+  };
+  await pause(20);
+  click("全部资源");
+  await pause(20);
+  click("编辑资源");
+  field("资源标题", "Cancelled");
+  click("取消");
+  assert.equal(run("records.get", { id: r.id }).title, "Source");
+  click("编辑资源");
+  field("资源标题", "Updated source");
+  field("分类（用逗号分隔）", "阅读，学习");
+  await save();
+  assert.equal(w.document.querySelector("dialog"), null);
+  assert.match(
+    w.document.querySelector("#content").textContent,
+    /Updated source/,
+  );
+  assert.deepEqual(run("records.get", { id: r.id }).tags, ["阅读", "学习"]);
+  click("查看资源记录");
+  await pause(20);
+  assert.equal(
+    w.document.querySelector("#breadcrumbs").textContent,
+    "资料库全部资源资源记录",
+  );
+  assert.equal(
+    w.document.querySelector(".resource-actions .source-link").href,
+    r.url,
+  );
+  assert.equal(
+    w.document.querySelectorAll("#breadcrumbs .source-link").length,
+    0,
+  );
+  click("编辑资源");
+  field("资源标题", "Detail title");
+  await save();
+  assert.equal(
+    w.document.querySelector("#view-description").textContent,
+    "Detail title",
+  );
+  click("编辑笔记");
+  field("笔记内容", "Revised note");
+  await save();
+  assert.match(
+    w.document.querySelector("#content").textContent,
+    /Revised note/,
+  );
+  click("编辑释义");
+  field("这处语境的释义", "新释义");
+  await save();
+  assert.equal(run("records.get", { id: o.id }).meaning, "新释义");
+  click("编辑单词");
+  await pause(10);
+  field("单词或短语", "context");
+  await save();
+  assert.equal(run("records.get", { id: v.id }).word, "context");
+  assert.match(w.document.querySelector("#content").textContent, /context/);
+  click("全部资源", w.document.querySelector("#breadcrumbs"));
+  await pause(20);
+  assert.match(
+    w.document.querySelector("#content").textContent,
+    /查看资源记录/,
+  );
+  click("单词簿");
+  await pause(20);
+  assert.match(w.document.querySelector("#content").textContent, /新释义/);
+  click("编辑释义");
+  field("这处语境的释义", "Draft kept on conflict");
+  const current = run("records.get", { id: o.id });
+  run("occurrences.update", {
+    id: o.id,
+    expectedRevision: current.revision,
+    meaning: "Other writer",
+  });
+  await save();
+  assert.ok(w.document.querySelector("dialog"));
+  assert.match(
+    w.document.querySelector("dialog [role=status]").textContent,
+    /已更新/,
+  );
+  assert.equal(
+    w.document.querySelector("dialog textarea").value,
+    "Draft kept on conflict",
+  );
+  click("取消");
+  click("思考笔记");
+  await pause(20);
+  click("编辑笔记");
+  field("笔记内容", "Final note");
+  await save();
+  assert.equal(run("records.get", { id: n.id }).text, "Final note");
+  assert.equal(run("records.get", { id: n.id }).anchorId, a.id);
+  w.document.querySelector("#query").value = "Detail title";
+  click("搜索");
+  await pause(20);
+  click("查看资源记录");
+  await pause(20);
+  assert.equal(
+    w.document.querySelector("#breadcrumbs").textContent,
+    "资料库搜索结果资源记录",
+  );
+  click("搜索结果", w.document.querySelector("#breadcrumbs"));
+  await pause(20);
+  assert.equal(w.document.querySelector("#query").value, "Detail title");
+  assert.match(
+    w.document.querySelector("#content").textContent,
+    /Detail title/,
+  );
+  click("资料库", w.document.querySelector("#breadcrumbs"));
+  await pause(20);
+  assert.equal(w.document.querySelector("#view-title").textContent, "学习统计");
+  assert.equal(w.document.querySelector("#query").value, "");
 });

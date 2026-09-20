@@ -37,6 +37,31 @@ function error(e: any) {
   $("status").textContent = e.message;
   $("status").className = "status error";
 }
+function navigate(next: string, clearQuery = false) {
+  detailResource = null;
+  view = next;
+  lastRenderKey = "";
+  if (clearQuery) $<HTMLInputElement>("query").value = "";
+  render().catch(error);
+}
+function breadcrumbs() {
+  const nav = $("breadcrumbs");
+  if (!nav) return;
+  const list = el("ol");
+  const entries: [string, (() => void) | null][] = [
+    ["资料库", () => navigate("stats", true)],
+    [views[view]![0], detailResource ? () => navigate(view) : null],
+  ];
+  if (detailResource) entries.push(["资源记录", null]);
+  for (const [label, action] of entries) {
+    const item = el("li");
+    const node = action ? button(label, action) : el("span", label);
+    if (!action) node.setAttribute("aria-current", "page");
+    item.append(node);
+    list.append(item);
+  }
+  nav.replaceChildren(list);
+}
 function heading(title: any, description: any) {
   if ($("view-title")) $("view-title").textContent = title;
   if ($("view-description")) $("view-description").textContent = description;
@@ -112,37 +137,158 @@ function empty(title: any, description: any) {
   block.append(el("h3", title), el("p", description));
   return block;
 }
-function editDialog(title: any, initial: any, save: any) {
+type EditField = {
+  key: string;
+  label: string;
+  value: string;
+  multiline?: boolean;
+  required?: boolean;
+  maxLength?: number;
+};
+function editDialog(
+  title: string,
+  fields: EditField[],
+  save: (values: Record<string, string>, operationId: string) => Promise<any>,
+  hint = "",
+) {
   const d = el("dialog", null, "dialog");
-  const input = el("textarea");
-  input.value = initial;
-  input.setAttribute("aria-label", title);
+  d.setAttribute("aria-label", title);
+  const form = el("form");
+  const inputs = new Map<string, HTMLInputElement | HTMLTextAreaElement>();
+  form.append(el("h2", title));
+  if (hint) form.append(el("p", hint, "muted"));
+  for (const field of fields) {
+    const label = el("label", field.label, "edit-field");
+    const input = field.multiline ? el("textarea") : el("input");
+    input.value = field.value;
+    input.required = !!field.required;
+    input.maxLength = field.maxLength || 12000;
+    input.setAttribute("aria-label", field.label);
+    inputs.set(field.key, input);
+    label.append(input);
+    form.append(label);
+  }
   const status = el("div", null, "status");
   status.setAttribute("role", "status");
   const actions = el("div", null, "actions");
-  const submit = button("保存", async () => {
+  const submit = el("button", "保存", "primary");
+  submit.type = "submit";
+  const cancel = button("取消", () => (d.close ? d.close() : d.remove()));
+  cancel.type = "button";
+  let attempt: { fingerprint: string; operationId: string } | undefined;
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    if (submit.disabled) return;
+    const values = Object.fromEntries(
+      [...inputs].map(([key, input]) => [key, input.value]),
+    );
+    if (fields.some((f) => f.required && !values[f.key]!.trim())) {
+      status.textContent = "必填内容不能为空";
+      return;
+    }
     submit.disabled = true;
+    cancel.disabled = true;
     try {
-      await save(input.value);
+      const fingerprint = JSON.stringify(values);
+      if (!attempt || attempt.fingerprint !== fingerprint)
+        attempt = { fingerprint, operationId: crypto.randomUUID() };
+      await save(values, attempt.operationId);
       d.remove();
+      lastRenderKey = "";
       await render();
     } catch (e) {
-      status.textContent = e.message;
+      status.textContent = `${e.message}。内容已保留；如有版本冲突，请复制草稿后取消并重新打开编辑。`;
     } finally {
       submit.disabled = false;
+      cancel.disabled = false;
     }
+  };
+  d.addEventListener("cancel", (event) => {
+    if (submit.disabled) event.preventDefault();
   });
-  submit.className = "primary";
-  actions.append(
-    submit,
-    button("取消", () => d.remove()),
-  );
-  d.append(el("h2", title), input, actions, status);
+  actions.append(submit, cancel);
+  form.append(actions, status);
+  d.append(form);
   document.body.append(d);
   d.addEventListener("close", () => d.remove());
   if (d.showModal) d.showModal();
   else d.setAttribute("open", "");
-  input.focus();
+  inputs.values().next().value?.focus();
+}
+function editResource(item: any) {
+  editDialog(
+    "编辑资源",
+    [
+      {
+        key: "title",
+        label: "资源标题",
+        value: item.title,
+        required: true,
+        maxLength: 500,
+      },
+      {
+        key: "tags",
+        label: "分类（用逗号分隔）",
+        value: (item.tags || []).join(", "),
+      },
+    ],
+    ({ title, tags }, operationId) =>
+      api("resources.update", {
+        id: item.id,
+        expectedRevision: item.revision,
+        title,
+        tags: tags!
+          .split(/[,，]/)
+          .map((x) => x.trim())
+          .filter(Boolean),
+        operationId,
+      }),
+    "修改名称与分类，不改变来源网址和原文语境。",
+  );
+}
+function editWord(item: any) {
+  editDialog(
+    "编辑单词",
+    [
+      {
+        key: "word",
+        label: "单词或短语",
+        value: item.word,
+        required: true,
+        maxLength: 300,
+      },
+    ],
+    ({ word }, operationId) =>
+      api("vocabulary.update", {
+        id: item.id,
+        expectedRevision: item.revision,
+        word,
+        operationId,
+      }),
+    "修改会应用于这个词条的所有语境，原文与复习记录保持不变。",
+  );
+}
+function editMeaning(item: any) {
+  editDialog(
+    "编辑释义",
+    [
+      {
+        key: "meaning",
+        label: "这处语境的释义",
+        value: item.meaning || "",
+        multiline: true,
+        maxLength: 4000,
+      },
+    ],
+    ({ meaning }, operationId) =>
+      api("occurrences.update", {
+        id: item.id,
+        expectedRevision: item.revision,
+        meaning,
+        operationId,
+      }),
+    "只修改这处语境的释义，其他语境不受影响。",
+  );
 }
 async function noteCard(item: any) {
   const card = el("article", null, "record");
@@ -161,16 +307,40 @@ async function noteCard(item: any) {
   if (item.kind === "note")
     actions.append(
       button("编辑笔记", () =>
-        editDialog("编辑笔记", item.text, (text: any) =>
-          api("notes.update", {
-            id: item.id,
-            expectedRevision: item.revision,
-            text,
-            operationId: crypto.randomUUID(),
-          }),
+        editDialog(
+          "编辑笔记",
+          [
+            {
+              key: "text",
+              label: "笔记内容",
+              value: item.text,
+              multiline: true,
+              required: true,
+            },
+          ],
+          ({ text }, operationId) =>
+            api("notes.update", {
+              id: item.id,
+              expectedRevision: item.revision,
+              text,
+              operationId,
+            }),
         ),
       ),
     );
+  if (item.kind === "occurrence") {
+    card.append(el("div", item.meaning || "尚未保存释义", "translation"));
+    actions.append(
+      button("编辑单词", async () => {
+        try {
+          editWord(await api("records.get", { id: item.vocabularyId }));
+        } catch (e) {
+          error(e);
+        }
+      }),
+      button("编辑释义", () => editMeaning(item)),
+    );
+  }
   card.append(actions);
   return card;
 }
@@ -292,6 +462,7 @@ async function render() {
   for (const b of document.querySelectorAll<HTMLElement>("[data-view]"))
     b.setAttribute("aria-current", b.dataset.view === view ? "page" : "false");
   $("status").className = "status";
+  breadcrumbs();
   if (detailResource) return resourceDetails(detailResource, gen);
   heading(...(views[view] || views.search!));
   if (view === "stats") {
@@ -338,7 +509,11 @@ async function render() {
     view === "review"
       ? `${items.length} 个待复习词条`
       : `${items.length} 条记录 · 本机保存`;
-  if (key === lastRenderKey) return;
+  if (
+    key === lastRenderKey &&
+    !["vocabulary.list", "review", "search"].includes(view)
+  )
+    return;
   const fragment = document.createDocumentFragment();
   for (const item of items) {
     let card = el("article", null, "record");
@@ -361,22 +536,7 @@ async function render() {
       open.className = "primary";
       actions.append(
         open,
-        button("编辑分类", () =>
-          editDialog(
-            "资源分类 · 用逗号分隔",
-            (item.tags || []).join(", "),
-            (text: any) =>
-              api("resources.update", {
-                id: item.id,
-                expectedRevision: item.revision,
-                tags: text
-                  .split(/[,，]/)
-                  .map((x: any) => x.trim())
-                  .filter(Boolean),
-                operationId: crypto.randomUUID(),
-              }),
-          ),
-        ),
+        button("编辑资源", () => editResource(item)),
       );
       card.append(tags, actions);
     } else if (item.kind === "vocabulary") {
@@ -408,13 +568,22 @@ async function render() {
         const block = el("div", null, "context-block");
         block.append(q, link(r, a));
         card.append(block);
-        answer.append(
-          el(
-            "div",
-            o.meaning || "尚未保存释义，可回到原文重新翻译。",
-            "translation",
-          ),
+        const meaning = el(
+          "div",
+          o.meaning || "尚未保存释义，可回到原文重新翻译。",
+          "translation",
         );
+        if (review) answer.append(meaning);
+        else {
+          const actions = el("div", null, "actions");
+          actions.append(button("编辑释义", () => editMeaning(o)));
+          block.append(meaning, actions);
+        }
+      }
+      if (!review) {
+        const actions = el("div", null, "actions");
+        actions.append(button("编辑单词", () => editWord(item)));
+        card.append(actions);
       }
       card.append(answer);
       if (review) {
@@ -453,7 +622,7 @@ async function render() {
           );
         card.append(reveal, ratings);
       }
-    } else if (item.kind === "note") {
+    } else if (item.kind === "note" || item.kind === "occurrence") {
       card = await noteCard(item);
     } else if (item.kind === "anchor") {
       const r = await api("records.get", { id: item.resourceId });
@@ -568,21 +737,22 @@ async function copyContext(anchorId: any, container: any) {
   else $("status").textContent = "请手动复制下方讨论上下文";
 }
 async function resourceDetails(r: any, gen: any) {
-  const [notes, occ] = await Promise.all([
+  const [latest, notes, occ] = await Promise.all([
+    api("records.get", { id: r.id }),
     all("notes.list", { resourceId: r.id }),
     all("occurrences.list", { resourceId: r.id }),
   ]);
   if (detailResource?.id !== r.id || gen !== renderGeneration) return;
+  r = latest;
+  detailResource = latest;
   heading("资源记录", r.title);
   const fragment = document.createDocumentFragment();
-  const back = button("返回全部资源", () => {
-    detailResource = null;
-    view = "resources.list";
-    lastRenderKey = "";
-    render().catch(error);
-  });
-  back.className = "back";
-  fragment.append(back, link(r));
+  const actions = el("div", null, "actions resource-actions");
+  actions.append(
+    button("编辑资源", () => editResource(r)),
+    link(r),
+  );
+  fragment.append(actions);
   for (const item of [...notes, ...occ]) {
     fragment.append(await noteCard(item));
     if (gen !== renderGeneration) return;
@@ -599,9 +769,7 @@ async function resourceDetails(r: any, gen: any) {
 }
 for (const b of document.querySelectorAll<HTMLElement>("[data-view]"))
   b.onclick = () => {
-    detailResource = null;
-    view = b.dataset.view!;
-    render().catch(error);
+    navigate(b.dataset.view!, true);
   };
 $("search").onclick = () => {
   detailResource = null;
