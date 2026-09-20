@@ -118,6 +118,7 @@ export const caps = {
     "discussions.create": {
       anchorId: "ID",
       question: "text",
+      noteId: "optional note ID; must belong to anchorId",
       selected: "optional text",
       selectionTranslation: "optional text",
       operationId: "unique request ID",

@@ -1308,3 +1308,88 @@ test("library deletion confirms scope, preserves data on cancel and restores eac
   assert.equal(run("notes.list").total, 1);
   click("取消");
 });
+
+test("library discussion focuses the clicked note or vocabulary occurrence instead of sibling notes", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "lc-handoff-ui-"));
+  const store = openStore(join(dir, "db"));
+  const run = (cmd, p = {}) =>
+    store.execute(cmd, p, { origin: "human", id: "chrome-ui", name: "用户" });
+  const r = run("resources.upsert", {
+    url: "https://example.com",
+    title: "Source",
+  });
+  const a = run("anchors.upsert", {
+    resourceId: r.id,
+    quote: "A word in context",
+  });
+  const note = run("notes.append", {
+    anchorId: a.id,
+    text: "The target thought",
+  });
+  run("notes.append", { anchorId: a.id, text: "Unrelated sibling thought" });
+  run("vocabulary.save", { anchorId: a.id, word: "context", meaning: "语境" });
+  const dom = new JSDOM(
+    readFileSync("apps/extension/lib/library.html", "utf8"),
+    { url: "https://example.com", runScripts: "outside-only" },
+  );
+  const w = dom.window;
+  t.onTestFinished(() => {
+    w.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  let copied = "";
+  Object.defineProperty(w.navigator, "clipboard", {
+    value: {
+      writeText: async (text) => {
+        copied = text;
+      },
+    },
+  });
+  w.chrome = {
+    runtime: {
+      connect: () => ({ onMessage: { addListener() {} } }),
+      sendMessage: async (m) => {
+        try {
+          return { ok: true, result: run(m.command, m.params) };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      },
+    },
+  };
+  w.eval(script("common"));
+  w.eval(script("library"));
+  await pause(20);
+  w.document.querySelector('[data-view="notes.list"]').click();
+  await pause(20);
+  const card = [...w.document.querySelectorAll("article.record")].find((x) =>
+    x.textContent.includes("The target thought"),
+  );
+  [...card.querySelectorAll("button")]
+    .find((x) => x.textContent === "在 Agent 中讨论")
+    .click();
+  await pause(20);
+  assert.ok(copied.includes(note.id));
+  assert.ok(copied.includes("The target thought"));
+  assert.ok(!copied.includes("Unrelated sibling thought"));
+  const discussion = run("export").objects.find((x) => x.kind === "discussion");
+  assert.equal(discussion.noteId, note.id);
+  // Search exposes occurrence cards through the same library renderer.
+  w.document.querySelector("#query").value = "context";
+  w.document.querySelector("#search").click();
+  await pause(20);
+  const occurrence = [...w.document.querySelectorAll("article.record")].find(
+    (x) => x.querySelector(".note-body")?.textContent === "context",
+  );
+  [...occurrence.querySelectorAll("button")]
+    .find((x) => x.textContent === "在 Agent 中讨论")
+    .click();
+  await pause(20);
+  assert.ok(copied.includes("选中内容：context"));
+  assert.ok(!copied.includes("当前笔记"));
+  const wordDiscussion = run("export").objects.find(
+    (x) => x.kind === "discussion" && x.selected === "context",
+  );
+  assert.equal(wordDiscussion.selectionTranslation, "语境");
+});
