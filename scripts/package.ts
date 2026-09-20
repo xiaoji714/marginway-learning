@@ -35,6 +35,10 @@ await build({
   packages: "bundle",
   sourcemap: false,
 });
+writeFileSync(
+  join(stage, "runtime/cli-version.json"),
+  JSON.stringify({ version }),
+);
 for (const f of [
   "README.md",
   "LICENSE",

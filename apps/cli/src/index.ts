@@ -1,29 +1,97 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { openStore } from "@context/core";
 const args = process.argv.slice(2);
 const cmd = args.shift() || "capabilities";
-function option(name: string) {
-  const i = args.indexOf(name);
-  return i < 0 ? null : args[i + 1];
+const allowed = new Set(["--input", "--json", "--actor", "--model"]);
+const options = new Map<string, string>();
+function invalid(message: string): never {
+  throw Object.assign(new Error(message), { code: "INVALID_ARGUMENT" });
 }
 let store;
 try {
-  const path = option("--input");
-  let params = path
-    ? JSON.parse(readFileSync(path === "-" ? 0 : path, "utf8"))
-    : {};
-  if (option("--json"))
-    params = { ...params, ...JSON.parse(option("--json")!) };
-  const actor = {
-    origin: "agent",
-    id: `cli:${option("--actor") || "external-agent"}`,
-    name: option("--actor") || "External Agent",
-    model: option("--model") || "unknown",
-    assurance: "local-os-user; client self-reported",
-  };
-  store = openStore();
-  const result = store.execute(cmd, params, actor);
+  for (let i = 0; i < args.length; i += 2) {
+    const name = args[i]!;
+    if (!allowed.has(name)) invalid("未知选项：" + name);
+    if (options.has(name)) invalid("重复选项：" + name);
+    const value = args[i + 1];
+    if (!value || value.startsWith("--")) invalid("选项缺少值：" + name);
+    options.set(name, value);
+  }
+  if (options.has("--json") && options.has("--input"))
+    invalid("--input 和 --json 只能选择一个");
+  const input = options.get("--input");
+  const raw = input
+    ? readFileSync(input === "-" ? 0 : input, "utf8")
+    : options.get("--json");
+  let params: Record<string, unknown> = {};
+  if (raw !== undefined) {
+    try {
+      params = JSON.parse(raw);
+    } catch {
+      invalid("输入不是有效 JSON");
+    }
+    if (!params || typeof params !== "object" || Array.isArray(params))
+      invalid("参数必须是 JSON 对象");
+  }
+  let result: unknown;
+  if (cmd === "help" || cmd === "--help") {
+    result = {
+      usage:
+        "learning <command> [--input <file|-> | --json <object>] [--actor <client>] [--model <model>]",
+      discovery: ["capabilities", "status", "skill", "--version"],
+      writes:
+        "commands declaring operationId require a nonempty ID; reuse it and identical input on retry",
+      setup:
+        "Use the installer output for the full CLI path. Run skill to discover the installed Skill.",
+    };
+  } else if (cmd === "--version" || cmd === "version") {
+    const packaged = join(import.meta.dirname, "cli-version.json");
+    result = {
+      version: JSON.parse(
+        readFileSync(
+          existsSync(packaged)
+            ? packaged
+            : join(import.meta.dirname, "../package.json"),
+          "utf8",
+        ),
+      ).version,
+    };
+  } else if (cmd === "skill") {
+    const path = [
+      join(import.meta.dirname, "skills/SKILL.md"),
+      join(import.meta.dirname, "../skills/SKILL.md"),
+      join(import.meta.dirname, "../../../skills/SKILL.md"),
+    ].find(existsSync);
+    if (!path)
+      throw Object.assign(new Error("Skill 未找到，请重新安装完整发布包"), {
+        code: "NOT_FOUND",
+      });
+    result = {
+      path,
+      content: readFileSync(path, "utf8"),
+      integration:
+        "Read this Skill directly or install its directory using your Agent's supported Skill mechanism.",
+    };
+  } else {
+    const actor = {
+      origin: "agent",
+      id: `cli:${options.get("--actor") || "external-agent"}`,
+      name: options.get("--actor") || "External Agent",
+      model: options.get("--model") || "unknown",
+      assurance: "local-os-user; client self-reported",
+    };
+    store = openStore();
+    const capabilities = store.execute("capabilities");
+    const descriptor = capabilities.commands[cmd];
+    if (
+      descriptor?.operationId &&
+      (typeof params.operationId !== "string" || !params.operationId.trim())
+    )
+      invalid("写入需要非空 operationId；重试请复用同一个 ID");
+    result = store.execute(cmd, params, actor);
+  }
   process.stdout.write(JSON.stringify({ ok: true, result }, null, 2) + "\n");
 } catch (e) {
   process.stderr.write(
