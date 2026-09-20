@@ -1,4 +1,5 @@
-import { canonical, fail, hash, str } from "../shared.js";
+import { randomUUID } from "node:crypto";
+import { fail, hash, str } from "../shared.js";
 import type { Repository, Handler } from "../repository.js";
 export function createVocabulary(
   repository: Repository,
@@ -14,7 +15,11 @@ export function createVocabulary(
       const language = str(p.language || "en", 20),
         id = "v_" + hash(language + ":" + word.toLocaleLowerCase());
       const v =
-        maybe(id) ||
+        rows("vocabulary").find(
+          (v) =>
+            v.language === language &&
+            v.word.toLocaleLowerCase() === word.toLocaleLowerCase(),
+        ) ||
         save(
           "vocabulary",
           {
@@ -24,13 +29,16 @@ export function createVocabulary(
             intervalDays: 0,
           },
           actor,
-          id,
+          maybe(id) ? randomUUID() : id,
         );
       const oid = "o_" + hash(v.id + ":" + a.id + ":" + word);
       result = {
         vocabulary: v,
         occurrence:
-          maybe(oid) ||
+          rows("occurrence").find(
+            (o) =>
+              o.vocabularyId === v.id && o.anchorId === a.id && o.word === word,
+          ) ||
           save(
             "occurrence",
             {
@@ -41,11 +49,44 @@ export function createVocabulary(
               meaning: str(p.meaning, 4000),
             },
             actor,
-            oid,
+            maybe(oid) ? randomUUID() : oid,
           ),
       };
 
       return result;
+    },
+    "vocabulary.update": (p, actor) => {
+      const v = get(p.id);
+      if (v.kind !== "vocabulary") fail("需要词条 ID");
+      if (v.revision !== p.expectedRevision)
+        fail("词条已更新，请重新打开编辑", "CONFLICT");
+      const word = str(p.word, 300).trim();
+      if (!word) fail("词条不能为空");
+      if (
+        rows("vocabulary").some(
+          (other) =>
+            other.id !== v.id &&
+            other.language === v.language &&
+            other.word.toLocaleLowerCase() === word.toLocaleLowerCase(),
+        )
+      )
+        fail("该词条已存在，请在单词簿中编辑已有词条", "CONFLICT");
+      // Keep stable IDs so review history and external Agent references survive corrections.
+      for (const o of rows("occurrence").filter((o) => o.vocabularyId === v.id))
+        save("occurrence", { ...o, word }, actor, o.id);
+      return save("vocabulary", { ...v, word }, actor, v.id);
+    },
+    "occurrences.update": (p, actor) => {
+      const o = get(p.id);
+      if (o.kind !== "occurrence") fail("需要词汇语境 ID");
+      if (o.revision !== p.expectedRevision)
+        fail("释义已更新，请重新打开编辑", "CONFLICT");
+      return save(
+        "occurrence",
+        { ...o, meaning: str(p.meaning, 4000) },
+        actor,
+        o.id,
+      );
     },
     "reviews.record": (p, actor) => {
       let result;

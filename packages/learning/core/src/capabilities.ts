@@ -56,6 +56,18 @@ export const caps = {
       language: "default en",
       operationId: "unique request ID",
     },
+    "vocabulary.update": {
+      id: "vocabulary ID; stable across word corrections",
+      word: "text; updates all occurrences; rejects existing word in same language",
+      expectedRevision: "integer",
+      operationId: "unique request ID",
+    },
+    "occurrences.update": {
+      id: "occurrence ID",
+      meaning: "text; this context only",
+      expectedRevision: "integer",
+      operationId: "unique request ID",
+    },
     "vocabulary.list": {
       query: "optional",
       due: "boolean",
