@@ -697,3 +697,8 @@ progress::-webkit-progress-value {
 .edit-field { display: grid; gap: 8px; margin: 16px 0; font-weight: 600; }
 .edit-field input, .edit-field textarea { font-weight: 400; }
 .dialog .muted { font-size: 14px; }
+
+.library button.danger-text { color: #965144; }
+.library button.danger { background: #9c493b; border-color: #9c493b; color: #fff; }
+.library button.danger:hover { background: #823e33; }
+.dialog .muted { white-space: pre-wrap; overflow-wrap: anywhere; }

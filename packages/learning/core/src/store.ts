@@ -14,10 +14,11 @@ import { createNotes } from "./domains/notes.js";
 import { createVocabulary } from "./domains/vocabulary.js";
 import { createDiscussions } from "./domains/discussions.js";
 import { createJobs } from "./domains/jobs.js";
+import { createTrash } from "./domains/trash.js";
 import { createBackup } from "./domains/backup.js";
 export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
   const repository = openRepository(file);
-  const { db, get, rows, resourceFor, anchorFor } = repository;
+  const { db, get, rows, resourceFor, anchorFor, isDeleted } = repository;
   const handlers = {
     ...createResources(repository),
     ...createNotes(repository),
@@ -25,6 +26,7 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
     ...createDiscussions(repository),
     ...createJobs(repository),
     ...createBackup(repository),
+    ...createTrash(repository),
   };
   function execute(
     cmd: string,
@@ -56,15 +58,15 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
         .prepare("SELECT data FROM revisions WHERE id=? ORDER BY seq")
         .all(p.id)
         .map((x) => JSON.parse(String(x.data)));
-    if (cmd === "stats")
-      return Object.fromEntries(
-        db
-          .prepare(
-            "SELECT kind,COUNT(*) n FROM objects WHERE kind!='resource' OR COALESCE(json_extract(data,'$.archived'),0)!=1 GROUP BY kind",
-          )
-          .all()
-          .map((x) => [x.kind, x.n]),
-      );
+    if (cmd === "stats") {
+      const counts: Record<string, number> = {};
+      for (const row of db.prepare("SELECT data FROM objects").all()) {
+        const record = JSON.parse(String(row.data));
+        if (!record.archived && !isDeleted(record))
+          counts[record.kind] = (counts[record.kind] || 0) + 1;
+      }
+      return counts;
+    }
     if (cmd === "export")
       return {
         schemaVersion: 1,
@@ -91,32 +93,33 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
       };
       const kind = kinds[cmd.split(".")[0]!];
       let list =
-        cmd === "activity.list"
+        cmd === "trash.list"
           ? db
-              .prepare(
-                "SELECT data FROM objects WHERE kind IN ('occurrence','note','review') AND json_extract(data,'$.origin')='human' ORDER BY updated DESC",
-              )
+              .prepare("SELECT data FROM objects ORDER BY updated DESC")
               .all()
-              .map((x) => {
-                const o = JSON.parse(String(x.data));
-                return {
-                  id: o.id,
-                  kind: o.kind,
-                  createdAt: o.createdAt,
-                  resourceId: o.resourceId,
-                };
-              })
-          : cmd === "search"
+              .map((row) => JSON.parse(String(row.data)))
+              .filter((record) => record.deleted)
+          : cmd === "activity.list"
             ? db
                 .prepare(
-                  "SELECT data FROM objects WHERE kind NOT IN ('job','translation') ORDER BY updated DESC",
+                  "SELECT data FROM objects WHERE kind IN ('occurrence','note','review') AND json_extract(data,'$.origin')='human' ORDER BY updated DESC",
                 )
                 .all()
                 .map((x) => JSON.parse(String(x.data)))
-            : kind
-              ? rows(kind)
-              : fail("未知命令", "UNKNOWN_COMMAND");
-      if (!p.includeArchived) list = list.filter((x) => !x.archived);
+            : cmd === "search"
+              ? db
+                  .prepare(
+                    "SELECT data FROM objects WHERE kind NOT IN ('job','translation') ORDER BY updated DESC",
+                  )
+                  .all()
+                  .map((x) => JSON.parse(String(x.data)))
+              : kind
+                ? rows(kind)
+                : fail("未知命令", "UNKNOWN_COMMAND");
+      if (cmd !== "trash.list") {
+        list = list.filter((x) => !isDeleted(x));
+        if (!p.includeArchived) list = list.filter((x) => !x.archived);
+      }
       if (p.resourceId)
         list = list.filter(
           (x) => x.resourceId === p.resourceId || x.id === p.resourceId,
@@ -133,6 +136,13 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
         list = list.filter(
           (x) => !x.dueAt || Date.parse(x.dueAt) <= Date.now(),
         );
+      if (cmd === "activity.list")
+        list = list.map((o) => ({
+          id: o.id,
+          kind: o.kind,
+          createdAt: o.createdAt,
+          resourceId: o.resourceId,
+        }));
       const offset = Math.max(0, Number(p.offset) || 0),
         limit = Math.min(200, Math.max(1, Number(p.limit) || 100));
       return {
@@ -151,7 +161,9 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
         (discussion.kind !== "discussion" || discussion.anchorId !== a.id)
       )
         fail("讨论不属于该位置");
-      const notes = rows("note").filter((n) => n.anchorId === a.id),
+      const notes = rows("note").filter(
+          (n) => n.anchorId === a.id && !isDeleted(n),
+        ),
         translation = rows("translation").find((t) => t.anchorId === a.id);
       const context = {
         resource: r,
