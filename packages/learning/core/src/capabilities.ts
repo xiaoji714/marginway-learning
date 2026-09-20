@@ -1,5 +1,21 @@
 export const caps = {
-  version: 1,
+  version: 2,
+  transport: {
+    success: "{ok:true,result}",
+    failure: "{ok:false,error:{code,message}} on stderr; exit 1",
+    pagination: "{items,total,offset,next}; next=null ends pagination",
+    errors: [
+      "INVALID_ARGUMENT",
+      "UNKNOWN_COMMAND",
+      "CONFLICT",
+      "FORBIDDEN",
+      "NOT_FOUND",
+      "DELETED",
+      "INTERNAL",
+    ],
+    retry:
+      "Reuse operationId and identical parameters and actor on write retries",
+  },
   commands: {
     status: {},
     "resources.upsert": {
@@ -81,14 +97,31 @@ export const caps = {
       offset: "integer",
       limit: "1..200",
     },
-    "occurrences.list": { resourceId: "optional", vocabularyId: "optional" },
+    "occurrences.list": {
+      resourceId: "optional",
+      vocabularyId: "optional",
+      offset: "integer",
+      limit: "1..200",
+    },
     "reviews.record": {
       vocabularyId: "ID",
       rating: "again|hard|good",
+      feedbackSource:
+        "optional user-confirmed; explicit user feedback relayed by Agent",
       operationId: "unique request ID",
     },
-    "reviews.list": {},
-    "discussions.create": { anchorId: "ID", question: "text" },
+    "reviews.list": {
+      vocabularyId: "optional ID",
+      offset: "integer",
+      limit: "1..200",
+    },
+    "discussions.create": {
+      anchorId: "ID",
+      question: "text",
+      selected: "optional text",
+      selectionTranslation: "optional text",
+      operationId: "unique request ID",
+    },
     "context.export": { anchorId: "ID", discussionId: "optional" },
     search: { query: "text", offset: "integer", limit: "1..200" },
     stats: {},
@@ -96,7 +129,7 @@ export const caps = {
       offset: "integer",
       limit: "1..200",
       description:
-        "Human-created occurrence/note/review events; use createdAt in the viewer timezone",
+        "Human captures and user-confirmed reviews (including Agent relay); use createdAt in viewer timezone",
     },
     "resources.setArchived": {
       id: "resource ID",
@@ -113,9 +146,17 @@ export const caps = {
       seconds: "for seek",
     },
     "jobs.get": { id: "ID" },
-    "jobs.list": {},
+    "jobs.list": {
+      resourceId: "optional ID",
+      offset: "integer",
+      limit: "1..200",
+    },
     "jobs.cancel": { id: "ID" },
-    "translations.list": { resourceId: "ID" },
+    "translations.list": {
+      resourceId: "ID",
+      offset: "integer",
+      limit: "1..200",
+    },
     "backup.import": {
       data: "export object; merges identical IDs, rejects conflicts",
       operationId: "unique request ID",

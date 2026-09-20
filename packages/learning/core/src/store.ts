@@ -102,7 +102,7 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
           : cmd === "activity.list"
             ? db
                 .prepare(
-                  "SELECT data FROM objects WHERE kind IN ('occurrence','note','review') AND json_extract(data,'$.origin')='human' ORDER BY updated DESC",
+                  "SELECT data FROM objects WHERE kind IN ('occurrence','note','review') AND (json_extract(data,'$.origin')='human' OR (kind='review' AND json_extract(data,'$.feedbackSource')='user-confirmed')) ORDER BY updated DESC",
                 )
                 .all()
                 .map((x) => JSON.parse(String(x.data)))
@@ -141,6 +141,9 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
           id: o.id,
           kind: o.kind,
           createdAt: o.createdAt,
+          origin: o.origin,
+          createdBy: o.createdBy,
+          feedbackSource: o.feedbackSource,
           resourceId: o.resourceId,
         }));
       const offset = Math.max(0, Number(p.offset) || 0),
