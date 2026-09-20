@@ -16,6 +16,8 @@ description: 查询和操作本机 Learning Companion 学习资料库；读取�
 3. 用户要求保存时，调用 `notes.append`，填写 `anchorId`、`text`、唯一 `operationId`，以及已有 `discussionId`。填写实际客户端身份；模型未知时保留 unknown。
 4. 用 `records.get` 验证返回的记录 ID、位置和来源。向用户提供结果所在资源和时间点。
 
+明确要求编辑时，资源标题/分类用 `resources.update`，词条修正用 `vocabulary.update`（更新关联语境词面，保留稳定 ID），单处释义用 `occurrences.update`。先 records.get，提供 expectedRevision 和唯一 operationId；同语言已有词条不自动合并。原文锚点与资源网址不可改写。
+
 默认追加，不替换用户笔记。明确要求修改时先读取记录，使用 `notes.update` 的 `expectedRevision`；遇到 CONFLICT 先重新读取，不能强行覆盖。重试同一个写入须复用原 operationId 与相同参数。
 
 CLI 写入强制标为 Agent；身份中的本机用户是执行边界，`--actor` 与 `--model` 为调用方自报，不代表经过模型身份认证。不得冒充用户或改变生成来源。
