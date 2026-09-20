@@ -225,6 +225,8 @@ test("resource detail survives database notifications and shows agent provenance
   w.eval(script("common"));
   w.eval(script("library"));
   await pause(10);
+  w.document.querySelector('[data-view="resources.list"]').click();
+  await pause(10);
   [...w.document.querySelectorAll("button")]
     .find((b) => b.textContent === "查看资源记录")
     .click();
@@ -822,8 +824,15 @@ test("learning heatmap uses 365 local calendar days, paginated records and click
   w.eval(script("common"));
   w.eval(script("library"));
   await pause(10);
-  w.document.querySelector('[data-view="stats"]').click();
   await pause(20);
+  assert.equal(w.document.querySelector("[data-view]").dataset.view, "stats");
+  assert.equal(
+    w.document
+      .querySelector('[data-view="stats"]')
+      .getAttribute("aria-current"),
+    "page",
+  );
+  assert.equal(w.document.getElementById("view-title").textContent, "学习统计");
   const cells = [...w.document.querySelectorAll(".activity-day")];
   assert.equal(cells.length, 365);
   assert.equal(new Set(cells.map((x) => x.dataset.date)).size, 365);
