@@ -25,6 +25,17 @@ export function openRepository(file: string) {
       return null;
     }
   };
+  const isDeleted = (obj: RecordData): boolean =>
+    Boolean(
+      obj.deleted ||
+      (obj.resourceId && maybe(obj.resourceId)?.deleted) ||
+      (obj.vocabularyId && maybe(obj.vocabularyId)?.deleted),
+    );
+  const active = (obj: RecordData): RecordData => {
+    if (isDeleted(obj))
+      fail("记录或所属资料已删除，请先从回收站恢复", "DELETED");
+    return obj;
+  };
   const put = (obj: RecordData) => {
     db.prepare(
       "INSERT INTO objects VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated,data=excluded.data",
@@ -47,7 +58,9 @@ export function openRepository(file: string) {
     data: RecordData,
     actor: Actor,
     id: string = randomUUID(),
+    allowDeleted = false,
   ) => {
+    if (!allowDeleted) active(data);
     const before = maybe(id);
     const now = new Date().toISOString();
     const obj = {
@@ -71,16 +84,29 @@ export function openRepository(file: string) {
   const resourceFor = (id: string, includeArchived = false) => {
     const r = get(id);
     if (r.kind !== "resource") fail("需要资源 ID");
+    if (!includeArchived) active(r);
     if (r.archived && !includeArchived) fail("资源已归档，请先恢复");
     return r;
   };
-  const anchorFor = (id: string) => {
+  const anchorFor = (id: string, includeDeleted = false) => {
     const a = get(id);
     if (a.kind !== "anchor") fail("需要位置 ID");
+    if (!includeDeleted) active(a);
     return a;
   };
 
-  return { db, get, maybe, put, rows, save, resourceFor, anchorFor };
+  return {
+    db,
+    get,
+    maybe,
+    put,
+    rows,
+    save,
+    resourceFor,
+    anchorFor,
+    isDeleted,
+    active,
+  };
 }
 export type Repository = ReturnType<typeof openRepository>;
 export type Handler = (params: RecordData, actor: Actor) => any;

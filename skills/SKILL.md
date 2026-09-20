@@ -35,3 +35,5 @@ CLI 写入强制标为 Agent；身份中的本机用户是执行边界，`--acto
 ## 学习足迹与资源维护
 
 `activity.list` 分页返回人为创建的词句语境、笔记与复习事件，按 createdAt 转换到用户本地日期统计；编辑不重复计数，自动任务和 Agent 生成内容不计入。`resources.list` 默认隐藏归档项，includeArchived=true 可查看。`resources.setArchived` 要求 id、expectedRevision 和 archived 布尔值；只能归档空资源，false 恢复，操作保留历史。不要根据相同标题合并不同网址。
+
+明确要求删除时用 `records.setDeleted`：id、expectedRevision、deleted=true、唯一 operationId；支持资源、词条、笔记、语境。`trash.list` 查询回收站，deleted=false 恢复，先恢复所属资源/词条。删除只隐藏并保留历史；资源关联记录一并隐藏、未完成任务取消，全局词条保留。不要自行恢复或永久擦除。

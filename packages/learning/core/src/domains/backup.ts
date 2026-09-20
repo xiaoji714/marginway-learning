@@ -47,8 +47,8 @@ export function createBackup(repository: Repository): Record<string, Handler> {
         }
       }
       for (const o of data.objects) {
-        if (o.resourceId) resourceFor(o.resourceId);
-        if (o.anchorId) anchorFor(o.anchorId);
+        if (o.resourceId) resourceFor(o.resourceId, true);
+        if (o.anchorId) anchorFor(o.anchorId, true);
       }
       result = { imported: data.objects.length };
 

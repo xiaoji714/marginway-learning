@@ -29,7 +29,14 @@ export const caps = {
       suffix: "text",
     },
     "anchors.list": { resourceId: "ID", offset: "integer", limit: "1..200" },
-    "records.get": { id: "ID" },
+    "records.get": { id: "ID; includes deleted records for inspection" },
+    "trash.list": { query: "optional", offset: "integer", limit: "1..200" },
+    "records.setDeleted": {
+      id: "resource/vocabulary/note/occurrence ID",
+      deleted: "boolean; false restores; parent must be restored first",
+      expectedRevision: "integer",
+      operationId: "unique request ID",
+    },
     "records.history": { id: "ID" },
     "notes.append": {
       anchorId: "ID",
