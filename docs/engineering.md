@@ -39,7 +39,11 @@ GitHub-hosted Linux/macOS/Windows 执行隔离安装烟测。Windows 烟测跳�
 
 `pnpm run build` 后运行 `pnpm exec tsx scripts/product-demo.ts`，打开输出的本机地址：`/card` 为现有语境卡片，`/library.html` 为现有资料库。只读演示使用临时 SQLite、合成文本和固定释义，Chrome RPC/供应商边界被替换，不连接个人库或服务；不是浏览器插件端到端验收。Ctrl+C 退出清理临时目录。
 
-README 两张 PNG 用上述当前组件渲染后在浏览器截取，不修改组件布局、不使用概念图或私人截图。重新截图库需进入「全部资源 → 查看资源记录」。演示包装页仅用于呈现组件；组件以 apps/extension 为唯一实现来源。
+README 演示图统一为 **1120 × 840 CSS px（4:3）** 视口，浏览器缩放 100%，PNG 输出（核对文件签名，不只改扩展名）；同批截图保持相同像素尺寸，README 均设置 `width="960"`，不指定高度，窄屏等比缩小。不拉伸、拼图或添加后期装饰；只截页面内容，不含浏览器边框。
+
+两图使用相同合成资料与浅色主题：卡片打开 `/card`；资料库打开 `/library.html`，进入「全部资源 → 查看资源记录」，回到顶部，等待内容稳定后截图。保存为 `docs/assets/product-card.png`、`product-library.png`，检查尺寸相同、文字清楚、主要操作完整可见，并在 README 预览核对同宽。修改组件后同步更新受影响截图。
+
+截图来自当前组件，不使用概念图或私人资料；演示包装页只呈现组件，以 apps/extension 为唯一实现来源。截图制作不改变生产组件布局，预览不代替完整扩展验收。
 
 ## 决策与协作
 
