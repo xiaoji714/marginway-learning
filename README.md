@@ -16,9 +16,9 @@
 
 视频下方显示当前句的双语字幕，侧栏保留前后文并跟随播放。需要理解一个词或记下想法时，就从字幕开始；点击时间点回到原处，也可以重播当前句。
 
-<img src="docs/assets/product-video.png" width="960" alt="实际运行：YouTube 视频下方显示当前句双语字幕，右侧字幕列表跟随播放，提供划词、笔记和回溯入口">
+<img src="docs/assets/product-overview.png" width="960" alt="实际运行：YouTube 视频下方显示当前句双语字幕，右侧字幕列表跟随播放，提供划词、笔记和回溯入口">
 
-<sub>实际使用截图，由维护者提供。视频：[Dwarkesh Podcast · OpenAI researcher on agent swarms & recursive self-improvement](https://www.youtube.com/watch?v=6AgOfiZOWiY)。</sub>
+<sub>[静态展示页源码](docs/product/index.html) · [查看原始截图](docs/assets/product-video.png)。视频：[Dwarkesh Podcast · OpenAI researcher on agent swarms & recursive self-improvement](https://www.youtube.com/watch?v=6AgOfiZOWiY)。</sub>
 
 ## 回到材料，继续学习
 
