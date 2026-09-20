@@ -596,6 +596,12 @@ test("explicit relayed user review counts as activity without changing agent pro
     feedbackSource: "user-confirmed",
   });
   expect(review.origin).toBe("agent");
+  const event = s
+    .execute("activity.list")
+    .items.find((x: any) => x.id === review.id);
+  expect(event.origin).toBe("agent");
+  expect(event.feedbackSource).toBe("user-confirmed");
+  expect(event.createdBy).toEqual(review.createdBy);
   expect(s.execute("activity.list").items.map((x: any) => x.id)).toContain(
     review.id,
   );
