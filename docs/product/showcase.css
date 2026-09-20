@@ -1,0 +1,78 @@
+/* Reusable, scoped presentation shell. The product screenshot is unmodified. */
+:root {
+  color-scheme: light;
+  background: #f6f7ef;
+}
+body { margin: 0; }
+.mw-showcase {
+  --mw-ink: #183b36;
+  --mw-muted: #5e7168;
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 40px;
+  color: var(--mw-ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.mw-showcase__intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+.mw-showcase__brand {
+  margin: 0 0 12px;
+  color: var(--mw-muted);
+  font-size: 14px;
+  letter-spacing: .02em;
+}
+.mw-showcase h1 {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -.035em;
+}
+.mw-showcase__description {
+  margin: 0 0 2px;
+  color: var(--mw-muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+.mw-showcase__figure { margin: 0; }
+.mw-showcase__image-link {
+  display: block;
+  border: 1px solid #dce2d8;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px #183b360a;
+}
+.mw-showcase img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.mw-showcase figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--mw-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mw-showcase figcaption a {
+  color: inherit;
+  text-decoration: none;
+}
+.mw-showcase figcaption a:hover { text-decoration: underline; }
+.mw-showcase a:focus-visible { outline: 3px solid #35765f; outline-offset: 4px; }
+@media (max-width: 720px) {
+  .mw-showcase { padding: 28px 20px; }
+  .mw-showcase__intro { display: block; margin-bottom: 22px; }
+  .mw-showcase__description { margin-top: 16px; font-size: 14px; }
+  .mw-showcase figcaption { flex-direction: column; gap: 6px; }
+  .mw-showcase__image-link { border-radius: 8px; }
+}
