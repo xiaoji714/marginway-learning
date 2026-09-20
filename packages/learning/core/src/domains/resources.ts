@@ -34,7 +34,7 @@ export function createResources(
       return result;
     },
     "resources.setArchived": (p, actor) => {
-      const r = resourceFor(p.id);
+      const r = resourceFor(p.id, true);
       if (typeof p.archived !== "boolean") fail("archived 必须为布尔值");
       if (r.revision !== p.expectedRevision)
         fail("资源已更新，请重新读取", "CONFLICT");

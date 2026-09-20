@@ -334,6 +334,16 @@ test("empty resource archive is reversible, audited, and rejects linked records 
   expect(run("resources.list", { includeArchived: true }).total).toBe(2);
   expect(run("search", { query: "Stale" }).total).toBe(0);
   expect(run("records.get", { id: empty.id }).archived).toBe(true);
+  expect(() =>
+    run("anchors.upsert", {
+      resourceId: empty.id,
+      quote: "Must not become hidden data",
+    }),
+  ).toThrow(/先恢复/);
+  expect(() =>
+    run("jobs.submit", { resourceId: empty.id, type: "transcript" }),
+  ).toThrow(/先恢复/);
+  expect(run("anchors.list", { resourceId: empty.id }).total).toBe(0);
   const restored = run("resources.setArchived", {
     id: empty.id,
     expectedRevision: archived.revision,
