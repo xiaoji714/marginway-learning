@@ -224,7 +224,10 @@ function editDialog(
   d.addEventListener("close", () => d.remove());
   if (d.showModal) d.showModal();
   else d.setAttribute("open", "");
-  (inputs.values().next().value || submit).focus();
+  (
+    inputs.values().next().value ||
+    (submitLabel === "移入回收站" ? cancel : submit)
+  ).focus();
 }
 const recordNames: Record<string, string> = {
   resource: "资源",

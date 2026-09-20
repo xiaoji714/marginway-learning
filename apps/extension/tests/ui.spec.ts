@@ -1251,6 +1251,7 @@ test("library deletion confirms scope, preserves data on cancel and restores eac
   await settle();
   click("删除笔记");
   assert.match(dialog().textContent, /只移除这条记录/);
+  assert.equal(w.document.activeElement.textContent, "取消");
   click("取消");
   assert.equal(run("notes.list").total, 1);
   click("删除笔记");
