@@ -174,6 +174,118 @@ async function noteCard(item: any) {
   card.append(actions);
   return card;
 }
+function activityHeatmap(events: DataRecord[], today = new Date()) {
+  const key = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const end = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    12,
+  );
+  const start = new Date(end);
+  start.setDate(start.getDate() - 364);
+  const days: {
+    date: string;
+    weekday: number;
+    month: number;
+    day: number;
+    counts: Record<string, number>;
+    total: number;
+  }[] = [];
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1))
+    days.push({
+      date: key(d),
+      weekday: d.getDay(),
+      month: d.getMonth() + 1,
+      day: d.getDate(),
+      counts: { occurrence: 0, note: 0, review: 0 },
+      total: 0,
+    });
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  for (const event of events) {
+    const date = new Date(event.createdAt);
+    if (!Number.isFinite(date.getTime())) continue;
+    const day = byDate.get(key(date));
+    if (day && Object.hasOwn(day.counts, event.kind)) {
+      day.counts[event.kind]!++;
+      day.total++;
+    }
+  }
+  const section = el("section", null, "activity-section");
+  section.setAttribute("aria-label", "学习记录热力图");
+  const total = days.reduce((n, d) => n + d.total, 0);
+  const active = days.filter((d) => d.total).length;
+  section.append(
+    el("h3", "学习足迹"),
+    el("p", `近一年 ${total} 条记录 · ${active} 个活跃日`, "muted"),
+  );
+  const scroll = el("div", null, "activity-scroll");
+  const calendar = el("div", null, "activity-calendar");
+  const months = el("div", null, "activity-months");
+  const grid = el("div", null, "activity-grid");
+  for (let i = 0; i < start.getDay(); i++) grid.append(el("span"));
+  const detail = el("p", "点击日期，查看当天的学习记录。", "activity-detail");
+  detail.setAttribute("role", "status");
+  days.forEach((day, i) => {
+    if (day.day === 1) {
+      const label = el("span", `${day.month}月`);
+      label.style.gridColumn = `${Math.floor((i + start.getDay()) / 7) + 1} / span 3`;
+      months.append(label);
+    }
+    const label = `${day.date} · ${day.total} 条记录`;
+    const cell = button("", () => {
+      grid
+        .querySelectorAll("button")
+        .forEach((b) => b.setAttribute("aria-pressed", "false"));
+      cell.setAttribute("aria-pressed", "true");
+      detail.textContent = `${day.date}：收藏词句 ${day.counts.occurrence} · 笔记 ${day.counts.note} · 复习 ${day.counts.review}`;
+    });
+    cell.className = "activity-day";
+    cell.dataset.level = String(
+      day.total === 0
+        ? 0
+        : day.total < 3
+          ? 1
+          : day.total < 6
+            ? 2
+            : day.total < 10
+              ? 3
+              : 4,
+    );
+    cell.dataset.date = day.date;
+    cell.title = label;
+    cell.setAttribute("aria-label", label);
+    cell.setAttribute("aria-pressed", "false");
+    grid.append(cell);
+  });
+  const weekday = el("div", null, "activity-weekdays");
+  for (const name of ["日", "", "二", "", "四", "", "六"])
+    weekday.append(el("span", name));
+  const body = el("div", null, "activity-body");
+  body.append(weekday, grid);
+  calendar.append(months, body);
+  scroll.append(calendar);
+  const legend = el("div", null, "activity-legend");
+  legend.append(el("span", "少"));
+  for (let i = 0; i < 5; i++) {
+    const swatch = el("span", null, "activity-swatch");
+    swatch.dataset.level = String(i);
+    legend.append(swatch);
+  }
+  legend.append(el("span", "多"));
+  section.append(
+    scroll,
+    legend,
+    detail,
+    el(
+      "p",
+      `${key(start)} — ${key(end)} · 按本地日期统计你保存的词句、新笔记和复习反馈；编辑不重复计数，自动翻译与 Agent 生成内容不计入。`,
+      "muted stats-footnote",
+    ),
+  );
+  return section;
+}
 async function render() {
   const gen = ++renderGeneration;
   const currentView = view;
@@ -183,7 +295,7 @@ async function render() {
   if (detailResource) return resourceDetails(detailResource, gen);
   heading(...(views[view] || views.search!));
   if (view === "stats") {
-    const s = await api("stats");
+    const [s, events] = await Promise.all([api("stats"), all("activity.list")]);
     if (gen !== renderGeneration) return;
     lastRenderKey = "";
     const grid = el("div", null, "stats-grid");
@@ -200,6 +312,7 @@ async function render() {
       grid.append(c);
     }
     $("content").replaceChildren(
+      activityHeatmap(events),
       grid,
       el(
         "p",

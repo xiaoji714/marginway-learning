@@ -29,3 +29,7 @@ CLI 写入强制标为 Agent；身份中的本机用户是执行边界，`--acto
 `vocabulary.list` 的 due=true 查询到期词；通过 `occurrences.list` 找原始语境。先让用户回忆再揭晓。`reviews.record` 只记录真实用户反馈，不把 Agent 自己的回答记作用户已经掌握。
 
 `export` 输出备份对象；`backup.import` 接收其中 result 作为 data，拒绝同 ID 的不同内容。大批备份使用 CLI，扩展 Native Messaging 单条输出有限额。备份没有密钥，仍包含个人学习内容，外传需符合用户授权。
+
+## 学习足迹与资源维护
+
+`activity.list` 分页返回人为创建的词句语境、笔记与复习事件，按 createdAt 转换到用户本地日期统计；编辑不重复计数，自动任务和 Agent 生成内容不计入。`resources.list` 默认隐藏归档项，includeArchived=true 可查看。`resources.setArchived` 要求 id、expectedRevision 和 archived 布尔值；只能归档空资源，false 恢复，操作保留历史。不要根据相同标题合并不同网址。

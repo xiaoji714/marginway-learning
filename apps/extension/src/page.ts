@@ -421,9 +421,12 @@
       host?.remove();
       host = null;
       root = null;
-      void ensureResource()
-        .then(() => refreshData())
-        .catch(() => {});
+      // Background page polling only registers actual video resources.
+      // Normal webpages are registered when the user selects content.
+      if (videoId())
+        void ensureResource()
+          .then(() => refreshData())
+          .catch(() => {});
     }
     mount();
     renderCurrent();

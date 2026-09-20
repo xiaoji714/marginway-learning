@@ -134,9 +134,16 @@ chrome.runtime.onMessage.addListener((m, sender, respond) => {
         const url = resourceUrl(currentTab.url!);
         if (m.command === "resources.upsert" && resourceUrl(p.url) !== url)
           throw new Error("页面已切换，请在当前视频重试");
-        const rid = (
-          await rpc("resources.upsert", { url, title: currentTab.title })
-        ).id;
+        // Authorization is read-only: stale reads after navigation must not
+        // register the destination page with the previous video's title.
+        const rid =
+          m.command === "resources.upsert"
+            ? null
+            : (
+                await rpc("resources.list", { query: url, limit: 200 })
+              ).items.find((r: any) => r.url === url && !r.archived)?.id;
+        if (m.command !== "resources.upsert" && !rid)
+          throw new Error("当前页面尚无学习资源，请重新选择内容");
         if (p.resourceId && p.resourceId !== rid)
           throw new Error("资源不属于当前页面");
         if (p.anchorId) {

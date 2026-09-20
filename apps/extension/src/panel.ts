@@ -35,6 +35,18 @@ async function load(fetchCaptions = true) {
   tab = await active();
   if (!/^https?:/.test(tab?.url || ""))
     throw new Error("请打开 YouTube 视频或普通网页");
+  const currentUrl = new URL(tab.url);
+  if (
+    /(^|\.)youtube\.com$/.test(currentUrl.hostname) &&
+    currentUrl.pathname !== "/watch"
+  ) {
+    resource = null;
+    anchors = [];
+    $("timeline").replaceChildren();
+    $("title").textContent = "打开一个 YouTube 视频，开始学习";
+    $("status").textContent = "首页、搜索和频道页不会自动加入资料库。";
+    return;
+  }
   try {
     await call({ lc: "activate", tabId: tab.id });
     pendingOrigin = null;

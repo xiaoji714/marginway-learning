@@ -59,7 +59,9 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
     if (cmd === "stats")
       return Object.fromEntries(
         db
-          .prepare("SELECT kind,COUNT(*) n FROM objects GROUP BY kind")
+          .prepare(
+            "SELECT kind,COUNT(*) n FROM objects WHERE kind!='resource' OR COALESCE(json_extract(data,'$.archived'),0)!=1 GROUP BY kind",
+          )
           .all()
           .map((x) => [x.kind, x.n]),
       );
@@ -89,16 +91,32 @@ export function openStore(file = join(DATA_DIR, "learning.sqlite")) {
       };
       const kind = kinds[cmd.split(".")[0]!];
       let list =
-        cmd === "search"
+        cmd === "activity.list"
           ? db
               .prepare(
-                "SELECT data FROM objects WHERE kind NOT IN ('job','translation') ORDER BY updated DESC",
+                "SELECT data FROM objects WHERE kind IN ('occurrence','note','review') AND json_extract(data,'$.origin')='human' ORDER BY updated DESC",
               )
               .all()
-              .map((x) => JSON.parse(String(x.data)))
-          : kind
-            ? rows(kind)
-            : fail("未知命令", "UNKNOWN_COMMAND");
+              .map((x) => {
+                const o = JSON.parse(String(x.data));
+                return {
+                  id: o.id,
+                  kind: o.kind,
+                  createdAt: o.createdAt,
+                  resourceId: o.resourceId,
+                };
+              })
+          : cmd === "search"
+            ? db
+                .prepare(
+                  "SELECT data FROM objects WHERE kind NOT IN ('job','translation') ORDER BY updated DESC",
+                )
+                .all()
+                .map((x) => JSON.parse(String(x.data)))
+            : kind
+              ? rows(kind)
+              : fail("未知命令", "UNKNOWN_COMMAND");
+      if (!p.includeArchived) list = list.filter((x) => !x.archived);
       if (p.resourceId)
         list = list.filter(
           (x) => x.resourceId === p.resourceId || x.id === p.resourceId,
