@@ -28,6 +28,7 @@ export function createBackup(repository: Repository): Record<string, Handler> {
         if (
           !kinds.has(o.kind) ||
           typeof o.id !== "string" ||
+          o.id.length > 128 ||
           !o.updatedAt ||
           !o.revision
         )

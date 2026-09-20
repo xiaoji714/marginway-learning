@@ -1,3 +1,4 @@
+import { DatabaseSync } from "node:sqlite";
 import { test, expect, vi } from "vitest";
 import { openStore, canonical } from "../src/store.js";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -490,4 +491,32 @@ test("short handoffs preserve sentence focus, agent provenance and web sources w
     run("context.export", { anchorId: a.id, discussionId: emptySelection.id })
       .prompt,
   ).toContain("Why?");
+});
+
+test("backup IDs cannot bypass handoff budget, and existing oversized references fail without truncation", (t) => {
+  const { run, r, a } = fixture(t);
+  const oversized = { ...a, id: "anchor-" + "x".repeat(2100) };
+  expect(() =>
+    run("backup.import", { data: { schemaVersion: 1, objects: [oversized] } }),
+  ).toThrow(/备份记录无效/);
+  expect(run("anchors.list", { resourceId: r.id }).total).toBe(1);
+  const boundary = { ...a, id: "b".repeat(128) };
+  run("backup.import", { data: { schemaVersion: 1, objects: [boundary] } });
+  expect(run("context.export", { anchorId: boundary.id }).prompt).toContain(
+    boundary.id,
+  );
+  // Simulate records written before the import bound existed, without real user data.
+  const db = new DatabaseSync(run("status").database);
+  db.prepare("INSERT INTO objects VALUES(?,?,?,?,?)").run(
+    oversized.id,
+    oversized.kind,
+    r.id,
+    oversized.updatedAt,
+    JSON.stringify(oversized),
+  );
+  db.close();
+  expect(() => run("context.export", { anchorId: oversized.id })).toThrow(
+    /2000 字符/,
+  );
+  expect(run("records.get", { id: oversized.id }).quote).toBe(a.quote);
 });

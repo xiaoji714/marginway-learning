@@ -92,5 +92,10 @@ export function discussionPrompt(
   lines.push(
     "完整材料按 Skill 按需读取；无法访问时先基于以上节选讨论，并说明限制。",
   );
-  return lines.join("\n");
+  const prompt = lines.join("\n");
+  if (Array.from(prompt).length > 2000)
+    fail(
+      "讨论交接超过 2000 字符：引用信息异常，不能截断 ID。可通过 records.get 读取原记录后重新整理引用。",
+    );
+  return prompt;
 }
