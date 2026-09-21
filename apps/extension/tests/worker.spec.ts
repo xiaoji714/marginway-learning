@@ -331,3 +331,118 @@ test("resource authorization reads never create a homepage during stale video re
     false,
   );
 });
+
+test("YouTube registration resolves identity-bound public titles, deduplicates requests and retries failures", async () => {
+  let listener, nativeListener;
+  const requests = [],
+    writes = [];
+  const noop = { addListener() {} };
+  let mode = "success";
+  const port = {
+    onMessage: { addListener: (fn) => (nativeListener = fn) },
+    onDisconnect: noop,
+    postMessage(m) {
+      writes.push(m);
+      queueMicrotask(() =>
+        nativeListener({
+          id: m.id,
+          ok: true,
+          result: m.command === "resources.upsert" ? m.params : null,
+        }),
+      );
+    },
+  };
+  runInNewContext(script("worker"), {
+    importScripts() {},
+    crypto: { randomUUID },
+    setTimeout,
+    clearTimeout,
+    setInterval() {},
+    queueMicrotask,
+    console,
+    URL,
+    URLSearchParams,
+    AbortSignal,
+    fetch: async (url, options) => {
+      requests.push({ url, options });
+      if (mode === "offline") throw new Error("offline");
+      return {
+        ok: mode !== "http-error",
+        json: async () => ({
+          title:
+            mode === "empty"
+              ? " "
+              : mode === "invalid"
+                ? 42
+                : "Correct video title",
+        }),
+      };
+    },
+    chrome: {
+      runtime: {
+        getURL: () => "chrome-extension://test/",
+        connectNative: () => port,
+        onConnect: noop,
+        onMessage: { addListener: (fn) => (listener = fn) },
+      },
+      action: { onClicked: noop },
+      sidePanel: { setPanelBehavior() {} },
+    },
+  });
+  const send = (video = "videoTITLE1") =>
+    new Promise<any>((resolve) =>
+      listener(
+        {
+          lc: "rpc",
+          command: "resources.upsert",
+          params: {
+            url: "https://www.youtube.com/watch?v=" + video + "&t=10",
+            title: "Stale previous video",
+          },
+        },
+        { url: "chrome-extension://test/panel.html" },
+        resolve,
+      ),
+    );
+  const results = await Promise.all([send(), send()]);
+  assert.equal(requests.length, 1);
+  assert.equal(results[0].result.title, "Correct video title");
+  assert.equal(
+    results[0].result.url,
+    "https://www.youtube.com/watch?v=videoTITLE1",
+  );
+  const endpoint = new URL(requests[0].url);
+  assert.equal(endpoint.origin, "https://www.youtube.com");
+  assert.equal(endpoint.pathname, "/oembed");
+  assert.equal(endpoint.searchParams.get("url"), results[0].result.url);
+  assert.equal(requests[0].options.headers, undefined);
+  for (const failure of ["offline", "http-error", "empty", "invalid"]) {
+    mode = failure;
+    const result = await send("videoFAIL11");
+    assert.equal(result.ok, true);
+    assert.equal(result.result.title, result.result.url);
+  }
+  mode = "success";
+  assert.equal((await send("videoFAIL11")).result.title, "Correct video title");
+  const before = requests.length;
+  await send("videoFAIL11");
+  assert.equal(requests.length, before);
+  for (let i = 0; i < 100; i++)
+    await send("video" + String(i).padStart(6, "0"));
+  const after = requests.length;
+  await send();
+  assert.equal(requests.length, after + 1);
+  const web = await new Promise<any>((resolve) =>
+    listener(
+      {
+        lc: "rpc",
+        command: "resources.upsert",
+        params: { url: "https://example.com", title: "Web title" },
+      },
+      { url: "chrome-extension://test/panel.html" },
+      resolve,
+    ),
+  );
+  assert.equal(web.result.title, "Web title");
+  assert.ok(!writes.some((x) => x.command === "jobs.submit"));
+});
