@@ -65,6 +65,15 @@ test("doctor is read-only, handles missing/corrupt databases and never treats a 
     verify(typeof value?.at === "string" ? value.at : null);
   }
   db.prepare("UPDATE meta SET value='{' WHERE key='bridge'").run();
-  expect(run(root).checks[0].code).toBe("DATABASE_UNREADABLE");
+  expect(
+    run(root)
+      .checks.slice(0, 2)
+      .map((c: any) => c.code),
+  ).toEqual(["DATABASE_READABLE", "HEARTBEAT_METADATA_INVALID"]);
+  db.prepare("DELETE FROM meta").run();
+  db.exec("PRAGMA journal_mode=WAL");
+  db.prepare("INSERT INTO objects VALUES('wal-record')").run();
+  verify(null);
+  expect(db.prepare("SELECT id FROM objects").get()?.id).toBe("wal-record");
   db.close();
 });

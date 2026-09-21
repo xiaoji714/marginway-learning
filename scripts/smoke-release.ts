@@ -31,6 +31,18 @@ try {
         file,
       );
   }
+  const diagnosticData = join(temp, "missing-doctor-data");
+  const diagnostic = spawnSync(
+    process.execPath,
+    ["--no-warnings", join(temp, "media/runtime/learning.js"), "doctor"],
+    { encoding: "utf8", env: { ...process.env, LC_DATA_DIR: diagnosticData } },
+  );
+  assert.equal(diagnostic.status, 0, diagnostic.stderr);
+  assert.equal(
+    JSON.parse(diagnostic.stdout).result.checks[0].code,
+    "DATABASE_MISSING",
+  );
+  assert.equal(existsSync(diagnosticData), false);
   const unpackedSkill = spawnSync(
     process.execPath,
     ["--no-warnings", join(temp, "media/runtime/learning.js"), "skill"],
