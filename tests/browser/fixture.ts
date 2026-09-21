@@ -15,6 +15,7 @@ import { installFixedClock } from "../../scripts/testing/fixed-clock.js";
 const fixedNow = "2026-09-21T00:00:00Z";
 const videoUrl = "https://www.youtube.com/watch?v=marginway01";
 export const test = base.extend<{
+  uncached: boolean;
   fixture: {
     context: BrowserContext;
     extension: string;
@@ -25,7 +26,8 @@ export const test = base.extend<{
     metadataRequests: string[];
   };
 }>({
-  fixture: async ({}, use, testInfo) => {
+  uncached: [false, { option: true }],
+  fixture: async ({ uncached }, use, testInfo) => {
     if (!process.env.MARGINWAY_CHROME)
       throw Error(
         "Set MARGINWAY_CHROME to Chrome for Testing executable; do not silently substitute Chromium.",
@@ -63,7 +65,7 @@ export const test = base.extend<{
             "Keep your own thoughts beside the source.",
           ][i],
         },
-        human,
+        { origin: "import", id: "supadata", name: "Native subtitles" },
       ),
     );
     const job = store.execute(
@@ -264,9 +266,10 @@ export const test = base.extend<{
         paidRequests,
         "cached workflows must not contact paid providers",
       ).toEqual([]);
-      expect(
-        cli("jobs.list").items.filter((j: any) => j.type === "transcript"),
-      ).toHaveLength(0);
+      if (!uncached)
+        expect(
+          cli("jobs.list").items.filter((j: any) => j.type === "transcript"),
+        ).toHaveLength(0);
       expect(
         cli("jobs.list").items.filter((j: any) => j.type === "lookup"),
       ).toHaveLength(1);

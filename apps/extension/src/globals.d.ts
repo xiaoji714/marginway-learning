@@ -42,6 +42,13 @@ interface LearningClient {
     id: string,
     onStatus?: (status: string) => void,
   ) => Promise<DataRecord>;
+  isCaption: (anchor: DataRecord) => boolean;
+  captionFailure: (
+    container: HTMLElement,
+    message: string,
+    retry: () => unknown,
+    resource: DataRecord,
+  ) => void;
   css: string;
   discussionCard: (options: CardOptions) => HTMLElement;
   clipboard: (

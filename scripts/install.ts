@@ -135,5 +135,5 @@ if (win && !args.includes("--skip-registration")) {
   if (p.status) throw new Error("Native host registration failed");
 }
 console.log(
-  `Extension: ${target}\nCLI: ${cli}\nSkill: ${join(skillPath, "SKILL.md")}\nNative host: ${manifest}\nReload the extension and refresh open pages.`,
+  `Extension: ${target}\nCLI: ${cli}\nSkill: ${join(skillPath, "SKILL.md")}\nNative host: ${manifest}\nOpen Marginway and verify the library connection first. Reload only after replacing extension files or if connection recovery requires it; in chrome://extensions enable Developer mode and use the circular-arrow icon on Marginway. Refresh an existing webpage only if its controls are missing.`,
 );
