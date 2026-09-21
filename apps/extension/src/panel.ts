@@ -12,6 +12,7 @@ let tab: any = null,
   currentDialog: any = null,
   pendingOrigin: any = null;
 let refreshSequence = 0;
+let captionState: "idle" | "loading" | "error" = "idle";
 const connection = chrome.runtime.connect({ name: "lc-view" });
 let refreshTimer: any;
 connection.onMessage.addListener((m) => {
@@ -30,6 +31,7 @@ async function active() {
 }
 async function load(fetchCaptions = true) {
   const gen = ++generation;
+  captionState = "idle";
   currentDialog?.dispose();
   currentDialog = null;
   const targetTab = await active();
@@ -85,21 +87,36 @@ async function load(fetchCaptions = true) {
   $("status").textContent = "本机资料库已连接";
   renderVersion = "";
   if (resource.type === "video" && fetchCaptions) {
-    const found = await api("anchors.list", {
-      resourceId: resource.id,
-      limit: 1,
-    });
+    const found = await all("anchors.list", { resourceId: resource.id });
     if (gen !== generation) return;
-    if (!found.total) {
-      $("status").textContent = "正在获取字幕…";
-      const j = await api("jobs.submit", {
-        type: "transcript",
-        resourceId: resource.id,
-      });
-      await waitJob(j.id);
+    if (!found.some(LC.isCaption)) {
+      captionState = "loading";
+      $("timeline").replaceChildren();
+      $("translation-progress").hidden = true;
+      $("status").textContent = "正在获取字幕…（最多 90 秒，排队时间另计）";
+      try {
+        const j = await api("jobs.submit", {
+          type: "transcript",
+          resourceId: resource.id,
+        });
+        await waitJob(j.id);
+      } catch (e) {
+        if (gen !== generation) return;
+        captionState = "error";
+        $("status").className = "status error";
+        LC.captionFailure(
+          $("status"),
+          e.message,
+          () => load().catch(showError),
+          resource,
+        );
+        return;
+      }
+      if (gen !== generation) return;
+      captionState = "idle";
     }
   }
-  if (gen === generation) {
+  {
     await refresh();
     if (resource.type === "video" && anchors.length) {
       await api("jobs.submit", {
@@ -118,13 +135,18 @@ async function refresh() {
   const seq = ++refreshSequence;
   if (!resource) return;
   const rid = resource.id;
-  const [a, n, t, o] = await Promise.all([
+  const [loaded, n, t, o] = await Promise.all([
     all("anchors.list", { resourceId: rid }),
     all("notes.list", { resourceId: rid }),
     all("translations.list", { resourceId: rid }),
     all("occurrences.list", { resourceId: rid }),
   ]);
   if (seq !== refreshSequence || rid !== resource?.id) return;
+  const a = resource.type === "video" ? loaded.filter(LC.isCaption) : loaded;
+  if (resource.type === "video" && a.length && captionState === "error") {
+    captionState = "idle";
+    $("status").className = "status";
+  }
   anchors = a.sort((x, y) => (x.start ?? Infinity) - (y.start ?? Infinity));
   notes = n;
   translations = t;
@@ -207,11 +229,14 @@ function updateTranslations() {
   }
 }
 function updateProgress(words: any) {
+  if (captionState !== "idle") return;
   const translated = new Set(translations.map((t: any) => t.anchorId));
   const count = anchors.filter((a: any) => translated.has(a.id)).length;
   $("status").textContent =
     resource.type === "video"
-      ? `${count === anchors.length ? "全文翻译完成" : "全文翻译中"} · ${count}/${anchors.length} 段`
+      ? anchors.length
+        ? `${count === anchors.length ? "全文翻译完成" : "全文翻译中"} · ${count}/${anchors.length} 段`
+        : "字幕尚未加载"
       : `${anchors.length} 处摘录 · ${notes.length} 条笔记 · ${words} 条词句`;
   $("follow").hidden = resource.type !== "video";
   const progress = $<HTMLProgressElement>("translation-progress");

@@ -480,3 +480,28 @@ test("YouTube registration resolves identity-bound public titles, deduplicates r
   assert.equal(web.result.title, "Web title");
   assert.ok(!writes.some((x) => x.command === "jobs.submit"));
 });
+
+test("page job status reads are authorized only for the live page resource", async () => {
+  const base = {
+    documentUrl: "https://www.youtube.com/watch?v=videoAAAAAA",
+    currentUrl: "https://www.youtube.com/watch?v=videoBBBBBB",
+    command: "jobs.list",
+  };
+  const current = await pageRpc({ ...base, params: {} });
+  assert.equal(current.response.ok, true);
+  assert.equal(
+    current.writes.find((m) => m.command === "jobs.list").params.resourceId,
+    "videoBBBBBB",
+  );
+  for (const args of [
+    { params: { resourceId: "videoAAAAAA" } },
+    { params: {}, frameId: 2 },
+  ]) {
+    const denied = await pageRpc({ ...base, ...args });
+    assert.equal(denied.response.ok, false);
+    assert.equal(
+      denied.writes.some((m) => m.command === "jobs.list"),
+      false,
+    );
+  }
+});

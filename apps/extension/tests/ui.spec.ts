@@ -133,7 +133,14 @@ test("under-video captions follow playback, mount once and seek to captured node
           m.command === "resources.upsert"
             ? resource
             : {
-                items: m.command === "anchors.list" ? anchors : [],
+                items:
+                  m.command === "anchors.list"
+                    ? anchors.map((a: any) => ({
+                        origin: "import",
+                        createdBy: { id: "supadata" },
+                        ...a,
+                      }))
+                    : [],
                 next: null,
                 total: anchors.length,
               },
@@ -335,7 +342,15 @@ test("default bilingual captions keep one stable node through translation notifi
   const requests = [];
   let translated = false;
   const r = { id: "r", url: w.location.href },
-    a = { id: "a", resourceId: "r", quote: "Hello", start: 0, end: 10 };
+    a = {
+      id: "a",
+      resourceId: "r",
+      quote: "Hello",
+      start: 0,
+      end: 10,
+      origin: "import",
+      createdBy: { id: "supadata" },
+    };
   w.setInterval = (fn) => (tick = fn);
   w.chrome = {
     runtime: {
@@ -426,7 +441,14 @@ test("follow button immediately locates a paused current caption and panel loads
         if (m.command === "resources.upsert") result = r;
         else if (m.command?.endsWith(".list"))
           result = {
-            items: m.command === "anchors.list" ? anchors : [],
+            items:
+              m.command === "anchors.list"
+                ? anchors.map((a: any) => ({
+                    origin: "import",
+                    createdBy: { id: "supadata" },
+                    ...a,
+                  }))
+                : [],
             total: m.command === "anchors.list" ? 1 : 0,
             next: null,
           };
