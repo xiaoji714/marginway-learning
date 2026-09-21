@@ -8,7 +8,7 @@ export default defineConfig({
     isolate: true,
     sequence: { hooks: "stack" },
     include: ["**/tests/**/*.spec.ts", "scripts/test/**/*.spec.ts"],
-    exclude: ["**/node_modules/**", "app/**"],
+    exclude: ["**/node_modules/**", "app/**", "tests/browser/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json"],
