@@ -1,5 +1,6 @@
 import {
   readdirSync,
+  existsSync,
   mkdirSync,
   rmSync,
   writeFileSync,
@@ -21,13 +22,16 @@ mkdirSync(directory, { recursive: true });
 const map = createCoverageMap({});
 const entries: string[] = [];
 try {
-  for (const app of ["extension", "cli", "native-host"]) {
-    for (const name of readdirSync(`apps/${app}/src`)) {
+  for (const app of readdirSync("apps").filter((name) =>
+    existsSync(`apps/${name}/src`),
+  )) {
+    for (const entry of readdirSync(`apps/${app}/src`, { recursive: true })) {
+      const name = String(entry);
       if (!name.endsWith(".ts") || name.endsWith(".d.ts")) continue;
       const file = `apps/${app}/src/${name}`;
       const { coverage, code } = instrument(file);
       map.addFileCoverage(coverage);
-      if (app !== "extension") {
+      if (["cli", "native-host"].includes(app) && name === "index.ts") {
         const target = `apps/${app}/lib/index.coverage.js`;
         entries.push(target);
         writeFileSync(

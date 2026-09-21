@@ -30,7 +30,9 @@ export function verifyDocs(root = process.cwd()): void {
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (
-        [".git", "node_modules", "lib", "dist", "coverage"].includes(entry.name)
+        [".git", ".local", "node_modules", "lib", "dist", "coverage"].includes(
+          entry.name,
+        )
       )
         continue;
       const path = join(dir, entry.name);
