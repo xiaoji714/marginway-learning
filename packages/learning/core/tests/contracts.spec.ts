@@ -520,3 +520,104 @@ test("backup IDs cannot bypass handoff budget, and existing oversized references
   );
   expect(run("records.get", { id: oversized.id }).quote).toBe(a.quote);
 });
+
+test("resource placeholders enrich once without overwriting names, identities, tags or linked content", (t) => {
+  const { run } = fixture(t);
+  for (const title of [
+    undefined,
+    " ",
+    "https://www.youtube.com/watch?v=videoTITLE1",
+    "youtube.com/watch?v=videoTITLE1",
+    "www.youtube.com/watch?v=videoTITLE1",
+    "YouTube",
+    "(2) YouTube",
+  ]) {
+    const r = run("resources.upsert", {
+      url: "https://www.youtube.com/watch?v=videoTITLE1",
+      title,
+    });
+    expect(r.title).toBe(r.url);
+    expect(r.revision).toBe(1);
+  }
+  let r = run("resources.upsert", {
+    url: "https://www.youtube.com/watch?v=videoTITLE1",
+  });
+  const a = run("anchors.upsert", { resourceId: r.id, quote: "Original" });
+  r = run("resources.update", {
+    id: r.id,
+    expectedRevision: r.revision,
+    tags: ["learning"],
+  });
+  r = run("resources.upsert", { url: r.url, title: "Real title" });
+  expect(r.title).toBe("Real title");
+  expect(r.tags).toEqual(["learning"]);
+  expect(run("anchors.list", { resourceId: r.id }).items[0].id).toBe(a.id);
+  expect(
+    run("resources.upsert", { url: r.url, title: "Other page title" }).revision,
+  ).toBe(r.revision);
+  r = run("resources.update", {
+    id: r.id,
+    expectedRevision: r.revision,
+    title: "My title",
+  });
+  expect(
+    run("resources.upsert", { url: r.url, title: "Official title" }).title,
+  ).toBe("My title");
+  r = run("resources.update", {
+    id: r.id,
+    expectedRevision: r.revision,
+    title: r.url,
+  });
+  expect(
+    run("resources.upsert", { url: r.url, title: "Official title" }).title,
+  ).toBe(r.url);
+});
+
+test("legacy placeholders enrich conservatively and archived resources restore with a real title", (t) => {
+  const { run } = fixture(t);
+  for (const [id, revision, title] of [
+    ["old-one", 1, "example.com/one"],
+    ["old-edited", 2, "example.com/edited"],
+    ["old-real", 1, "Existing title"],
+  ] as const) {
+    const url = title.startsWith("example.com")
+      ? "https://" + title
+      : "https://example.com/real";
+    const record = run("resources.upsert", { url });
+    const db = new DatabaseSync(run("status").database);
+    const legacy = { ...record, title, revision };
+    delete legacy.titleEdited;
+    db.prepare("UPDATE objects SET data=? WHERE id=?").run(
+      JSON.stringify(legacy),
+      record.id,
+    );
+    db.close();
+    const result = run("resources.upsert", { url, title: "Resolved title" });
+    expect(result.title).toBe(id === "old-one" ? "Resolved title" : title);
+    if (id === "old-real")
+      expect(
+        run("resources.update", {
+          id: result.id,
+          expectedRevision: result.revision,
+          tags: ["tag"],
+        }).titleEdited,
+      ).toBe(true);
+    if (id === "old-edited") {
+      const tagged = run("resources.update", {
+        id: result.id,
+        expectedRevision: result.revision,
+        tags: ["tag"],
+      });
+      expect(tagged.titleEdited).toBe(true);
+    }
+  }
+  let r = run("resources.upsert", { url: "https://example.com/archived" });
+  r = run("resources.setArchived", {
+    id: r.id,
+    expectedRevision: r.revision,
+    archived: true,
+  });
+  r = run("resources.upsert", { url: r.url, title: "Restored title" });
+  expect(r.archived).toBe(false);
+  expect(r.title).toBe("Restored title");
+});

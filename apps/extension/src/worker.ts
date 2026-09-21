@@ -91,6 +91,39 @@ function resourceUrl(value: any) {
   }
   return u.href;
 }
+// Resolve YouTube titles by identity, not an asynchronously changing SPA/tab title.
+const videoTitles = new Map<string, Promise<string>>();
+async function resourceMetadata(params: any) {
+  const url = resourceUrl(params.url);
+  if (!url.startsWith("https://www.youtube.com/watch?")) return params;
+  let pendingTitle = videoTitles.get(url);
+  if (!pendingTitle) {
+    pendingTitle = (async () => {
+      try {
+        const response = await fetch(
+          "https://www.youtube.com/oembed?" +
+            new URLSearchParams({ url, format: "json" }),
+          { signal: AbortSignal.timeout(5000) },
+        );
+        if (!response.ok) throw new Error("视频标题暂不可用");
+        const data = await response.json();
+        if (typeof data.title !== "string" || !data.title.trim())
+          throw new Error("视频标题为空");
+        return data.title.trim();
+      } catch {
+        // Retry on the next registration; no paid provider or perpetual background loop.
+        return url;
+      }
+    })();
+    if (videoTitles.size >= 100)
+      videoTitles.delete(videoTitles.keys().next().value!);
+    videoTitles.set(url, pendingTitle);
+  }
+  const title = await pendingTitle;
+  if (title === url && videoTitles.get(url) === pendingTitle)
+    videoTitles.delete(url);
+  return { ...params, url, title };
+}
 const pageAllowed = new Set([
   "resources.upsert",
   "anchors.upsert",
@@ -157,7 +190,11 @@ chrome.runtime.onMessage.addListener((m, sender, respond) => {
         }
         if (m.command.endsWith(".list")) m.params = { ...p, resourceId: rid };
       }
-      const r = await rpc(m.command, m.params);
+      const params =
+        m.command === "resources.upsert"
+          ? await resourceMetadata(m.params)
+          : m.params;
+      const r = await rpc(m.command, params);
       if (m.command === "jobs.submit") {
         if (m.params?.type === "translate")
           void queueWholeTranscript(r.resourceId).catch(() => {});
