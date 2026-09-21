@@ -5,9 +5,7 @@
   "bypass_actors": [],
   "conditions": {
     "ref_name": {
-      "include": [
-        "refs/heads/main"
-      ],
+      "include": ["refs/heads/main"],
       "exclude": []
     }
   },
@@ -26,11 +24,7 @@
         "require_code_owner_review": false,
         "require_last_push_approval": false,
         "required_review_thread_resolution": true,
-        "allowed_merge_methods": [
-          "merge",
-          "squash",
-          "rebase"
-        ]
+        "allowed_merge_methods": ["merge", "squash", "rebase"]
       }
     },
     {
@@ -45,6 +39,10 @@
           },
           {
             "context": "Issue policy",
+            "integration_id": 15368
+          },
+          {
+            "context": "chrome",
             "integration_id": 15368
           }
         ]

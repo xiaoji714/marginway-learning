@@ -1,8 +1,7 @@
-import { script } from "./support.js";
+import { script, runInNewContext } from "./support.js";
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
 import { randomUUID } from "node:crypto";
 test("translation cache beyond first page avoids another paid provider request", async () => {
   let onMessage,
@@ -139,29 +138,64 @@ test("seek prefers the active matching video instead of a stale duplicate", asyn
 });
 test("whole transcript queue includes offscreen anchors and skips cached translations", async () => {
   const submissions = [];
-  const code = script("worker");
-  const start = code.indexOf("async function queueWholeTranscript");
-  const context = {
-    wholeQueued: new Set(),
-    rpc: async (command, p) => {
-      if (command === "records.get") return { type: "video" };
-      if (command === "anchors.list")
-        return {
+  let listener, reply;
+  const noop = { addListener() {} };
+  const port = {
+    onMessage: {
+      addListener(fn) {
+        reply = fn;
+      },
+    },
+    onDisconnect: noop,
+    postMessage(m) {
+      let result = null;
+      if (m.command === "records.get") result = { type: "video" };
+      if (m.command === "anchors.list")
+        result = {
           items: Array.from({ length: 11 }, (_, i) => ({
             id: "a" + i,
             start: i,
           })),
           next: null,
         };
-      if (command === "translations.list")
-        return { items: [{ anchorId: "a0" }], next: null };
-      if (command === "jobs.submit") submissions.push(p);
+      if (m.command === "translations.list")
+        result = { items: [{ anchorId: "a0" }], next: null };
+      if (m.command === "jobs.submit") {
+        if (m.params.anchorIds) submissions.push(m.params);
+        result = { resourceId: "r" };
+      }
+      queueMicrotask(() => reply({ id: m.id, ok: true, result }));
     },
   };
-  await runInNewContext(
-    code.slice(start) + '\nqueueWholeTranscript("r");',
-    context,
+  runInNewContext(script("worker"), {
+    importScripts() {},
+    crypto: { randomUUID },
+    setTimeout,
+    clearTimeout,
+    setInterval() {},
+    chrome: {
+      runtime: {
+        connectNative: () => port,
+        onConnect: noop,
+        onMessage: {
+          addListener(fn) {
+            listener = fn;
+          },
+        },
+      },
+      action: { onClicked: noop },
+      sidePanel: { setPanelBehavior() {} },
+    },
+  });
+  await new Promise((resolve) =>
+    listener(
+      { lc: "rpc", command: "jobs.submit", params: { type: "translate" } },
+      {},
+      resolve,
+    ),
   );
+  for (let i = 0; i < 30 && submissions.length < 3; i++)
+    await new Promise((r) => setTimeout(r, 5));
   assert.deepEqual(
     submissions.flatMap((p) => Array.from(p.anchorIds)),
     Array.from({ length: 10 }, (_, i) => "a" + (i + 1)),
