@@ -135,6 +135,7 @@ const pageAllowed = new Set([
   "discussions.create",
   "jobs.submit",
   "jobs.get",
+  "jobs.list",
   "anchors.list",
   "translations.list",
   "records.get",

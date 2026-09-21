@@ -222,18 +222,15 @@ test.describe("uncached subtitle recovery", () => {
     const page = await context.newPage();
     await page.goto(url);
     const caption = page.getByRole("region", { name: "语境双语字幕" });
-    await caption
-      .getByRole("button", { name: "加载字幕", exact: true })
-      .click();
-    await expect(caption.getByRole("alert")).toContainText("Supadata API Key");
-    expect(
-      cli("jobs.list").items.filter((j: any) => j.type === "transcript"),
-    ).toHaveLength(1);
     const panel = await context.newPage();
     await panel.setViewportSize({ width: 380, height: 900 });
     await panel.goto(`chrome-extension://${extension}/panel.html`);
     await page.bringToFront();
     await expect(panel.getByRole("alert")).toContainText("Supadata API Key");
+    await expect(caption.getByRole("alert")).toContainText("Supadata API Key");
+    expect(
+      cli("jobs.list").items.filter((j: any) => j.type === "transcript"),
+    ).toHaveLength(1);
     await context.grantPermissions(["clipboard-read", "clipboard-write"], {
       origin: new URL(url).origin,
     });
