@@ -10,7 +10,15 @@ test("CLI rejects malformed options and supports discoverable independent learni
   const run = (...args: string[]) =>
     spawnSync(
       process.execPath,
-      ["--no-warnings", "--import", "tsx", "apps/cli/src/index.ts", ...args],
+      [
+        "--no-warnings",
+        "--import",
+        "tsx",
+        process.env.LC_RUNTIME_COVERAGE
+          ? "apps/cli/lib/index.coverage.js"
+          : "apps/cli/src/index.ts",
+        ...args,
+      ],
       { encoding: "utf8", env: { ...process.env, LC_DATA_DIR: dir } },
     );
   const call = (cmd: string, p?: object) => {

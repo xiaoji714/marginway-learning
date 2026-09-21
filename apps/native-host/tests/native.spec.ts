@@ -5,7 +5,9 @@ import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const entry = "apps/native-host/lib/index.js";
+const entry = process.env.LC_RUNTIME_COVERAGE
+  ? "apps/native-host/lib/index.coverage.js"
+  : "apps/native-host/lib/index.js";
 test("native framing and CLI share durable records, invalid JSON does not kill the bridge", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "lc-native-"));
   const env = { ...process.env, LC_DATA_DIR: dir, LC_EXTENSION_ID: id };
@@ -17,7 +19,7 @@ test("native framing and CLI share durable records, invalid JSON does not kill t
   onTestFinished(async () => {
     if (child.exitCode === null && child.signalCode === null) {
       const done = once(child, "exit");
-      child.kill();
+      child.stdin.end();
       await done;
     }
     rmSync(dir, { recursive: true, force: true });
