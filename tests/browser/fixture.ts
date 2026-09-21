@@ -11,6 +11,8 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { openStore } from "../../packages/learning/core/src/store.js";
 
+import { installFixedClock } from "../../scripts/testing/fixed-clock.js";
+const fixedNow = "2026-09-21T00:00:00Z";
 const videoUrl = "https://www.youtube.com/watch?v=marginway01";
 export const test = base.extend<{
   fixture: {
@@ -39,6 +41,7 @@ export const test = base.extend<{
       .replace(/[0-9a-f]/g, (c) => String.fromCharCode(97 + parseInt(c, 16)));
     const data = join(directory, "data");
     mkdirSync(data, { recursive: true });
+    const restoreClock = installFixedClock(fixedNow);
     const store = openStore(join(data, "learning.sqlite"));
     const human = { origin: "human", id: "chrome-ui", name: "Fixture" };
     const resource = store.execute(
@@ -92,12 +95,25 @@ export const test = base.extend<{
       { anchorId: anchors[0]!.id, word: "Context", meaning: "语境" },
       human,
     );
+    const lookup = store.execute(
+      "jobs.submit",
+      {
+        type: "lookup",
+        resourceId: resource.id,
+        anchorId: anchors[0]!.id,
+        text: "Context",
+      },
+      human,
+    );
+    store.execute("jobs.claim", {}, human);
+    store.execute("jobs.complete", { id: lookup.id, text: "语境" }, human);
     store.close();
+    restoreClock();
     const launcher = join(directory, "native-host");
     const quote = (s: string) => "'" + s.replaceAll("'", "'\\''") + "'";
     writeFileSync(
       launcher,
-      `#!/bin/sh\nexport LC_DATA_DIR=${quote(data)}\nexport LC_EXTENSION_ID=${quote(extension)}\nexec ${quote(process.execPath)} --no-warnings ${quote(resolve("apps/native-host/lib/index.js"))} "$@"\n`,
+      `#!/bin/sh\nexport LC_DATA_DIR=${quote(data)}\nexport LC_EXTENSION_ID=${quote(extension)}\nexport LC_TEST_NOW=${quote(fixedNow)}\nexec ${quote(process.execPath)} --no-warnings --import ${quote(resolve("node_modules/tsx/dist/loader.mjs"))} --import ${quote(resolve("scripts/testing/fixed-clock.ts"))} ${quote(resolve("apps/native-host/lib/index.js"))} "$@"\n`,
       { mode: 0o700 },
     );
     const config = join(directory, "config");
@@ -124,6 +140,10 @@ export const test = base.extend<{
         process.execPath,
         [
           "--no-warnings",
+          "--import",
+          resolve("node_modules/tsx/dist/loader.mjs"),
+          "--import",
+          resolve("scripts/testing/fixed-clock.ts"),
           resolve("apps/cli/lib/index.js"),
           command,
           "--json",
@@ -156,6 +176,26 @@ export const test = base.extend<{
             "--no-sandbox",
           ],
         },
+      );
+      await context.addInitScript(
+        ({ now }) => {
+          const Original = Date;
+          const value = Original.parse(now);
+          globalThis.Date = new Proxy(Original, {
+            construct(target, args) {
+              return Reflect.construct(target, args.length ? args : [value]);
+            },
+            apply() {
+              return new Original(value).toString();
+            },
+            get(target, key, receiver) {
+              return key === "now"
+                ? () => value
+                : Reflect.get(target, key, receiver);
+            },
+          });
+        },
+        { now: fixedNow },
       );
       await context.route("**/*", async (route) => {
         const u = new URL(route.request().url());
