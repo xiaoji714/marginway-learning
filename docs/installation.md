@@ -1,6 +1,6 @@
 # 安装与开始使用
 
-优先把 [Marginway Skill](../skills/SKILL.md) 交给能操作本机的 Agent；它会从未安装状态引导到配置和验证。下面是供 Agent 查阅或手动操作的完整步骤。
+优先将 [Marginway Skill](../skills/SKILL.md) 交给能操作本机的 Agent。以下为安装、配置与验证步骤。
 
 当前是早期开发版：使用桌面 Chrome，从源码构建后加载扩展。没有 Chrome 商店安装入口或免 Node 安装器；手机 Chrome 不支持桌面扩展。macOS 已实测，Windows/Linux 通过隔离安装 CI，仍需真实 Chrome 验证。
 
@@ -17,11 +17,11 @@ pnpm install --frozen-lockfile
 pnpm run package
 ```
 
-若当前终端不在计划放源码的位置，先切换到你选的父目录。源码 checkout 与 Chrome 长期加载目录可以分开；后续运行不依赖源码目录。
+先切换到选定的源码父目录再克隆。源码与 Chrome 长期加载目录可以分开，运行不依赖源码。
 
 ## 选择长期目录并加载
 
-1. 解压 `dist/marginway-learning-<版本>.zip`，保留 `extension/` 与 `runtime/`。
+1. 解压 `dist/marginway-learning-<版本>.zip`，保留完整包（含 `extension/`、`runtime/`、`skills/`）。
 2. 明确选择 Chrome 要长期加载的目录。可以直接使用解压包的 `extension/`；也可将其中**全部内容**复制到自己的目录，确保根部有 `manifest.json`。
 3. 打开 `chrome://extensions`，开启开发者模式，点击「加载已解压的扩展程序」，选择第 2 步的目录。复制页面显示的扩展 ID。
 4. 在解压目录中运行下方命令，将占位符换成实际值，含空格路径保留引号：
@@ -30,13 +30,13 @@ pnpm run package
 node runtime/install.js --extension-id <扩展ID> --extension-dir "<Chrome加载目录的完整路径>"
 ```
 
-安装器输出 Extension、CLI、Skill 和 Native host 的准确路径。核对 Extension 与 Chrome 的目录相同。需要位置建议时，可选 macOS/Linux 的 `~/Documents/marginway-learning` 或 Windows 的 `%USERPROFILE%\Documents\marginway-learning`，它们不是固定要求。
+安装器输出 Extension、CLI、Skill 和 Native host 的准确路径。核对 Extension 与 Chrome 的目录相同。需要位置建议时，可选 macOS/Linux 的 `~/Documents/marginway-learning` 或 Windows 的 `%USERPROFILE%\Documents\marginway-learning`，仅作建议。
 
-安装器将桥接与 CLI 复制到独立 runtime。请保留安装时使用的 Node：当前桥接仍引用它的可执行文件。CLI 默认位于 macOS/Linux 的 `~/.local/bin/learning`，Windows 的 `%USERPROFILE%\.local\bin\learning.cmd`；可以直接运行完整路径，不必先修改 PATH。运行该 CLI 的 `skill` 命令即可取得持久保存的 Skill 路径与正文；让 Agent 读取，或用其支持的 Skill 安装方式接入该目录。无需保留源码或解压包，也不会自动修改其他 Agent 的配置。
+安装器将桥接与 CLI 复制到独立 runtime。请保留安装时使用的 Node：当前桥接仍引用它的可执行文件。CLI 默认位于 macOS/Linux 的 `~/.local/bin/learning`，Windows 的 `%USERPROFILE%\.local\bin\learning.cmd`；可以直接运行完整路径，不必先修改 PATH。运行该 CLI 的 `skill` 命令即可取得持久保存的 Skill 路径与正文；让 Agent 读取，或用其支持的 Skill 安装方式接入该目录。不会自动修改其他 Agent 配置。源码可移除；若 Chrome 直接加载解压包内的 extension，必须保留该目录。只有扩展另存于长期目录后，才可删除安装介质。
 
 ## 配置与第一条记录
 
-1. 打开扩展设置，填写自己的 Supadata、DeepSeek API Key。第三方服务可能收费；Supadata 仅获取原生字幕，没有原生字幕的视频暂不支持。
+1. 按[服务配置](configuration.md)填写 Supadata、DeepSeek API Key 并保存；该文档提供平台链接、设置截图及费用说明。
 2. 重新加载扩展并刷新已有网页。点击 Chrome 工具栏扩展按钮打开侧栏。
 3. 打开有原生字幕的 YouTube 视频，查看视频下方和侧栏双语字幕；也可以在普通网页划词，收藏词条或记录想法。
 4. 打开资料库，确认记录可见，并尝试回到原文。用安装器输出的 CLI 完整路径运行 `capabilities`、`status`，确认访问同一本机资料库。
@@ -48,6 +48,7 @@ node runtime/install.js --extension-id <扩展ID> --extension-dir "<Chrome加载
 升级先导出学习备份，用新的完整包重复第 4 步安装命令，保持目录与 ID 一致，再重新加载扩展。安装器会备份旧扩展文件；不会删除 SQLite。切换 Chrome 加载目录可能改变 ID，必须用新 ID 重装桥接；卸载扩展会清除该扩展的密钥配置，迁移前自行保留密钥。
 
 无法连接时，核对 Node 仍存在、Chrome ID 与安装参数一致，然后用当前包重新运行安装器并重载扩展。请勿通过删除资料库解决连接问题。
+
 ## Agent 诊断
 
 CLI 启动前，Agent 检查 Node 版本和 Node/CLI 绝对路径；运行构建包不需要 Git/pnpm。CLI 可运行后执行 `learning doctor`，根据[诊断契约](https://github.com/xiaoji714/marginway-learning/blob/main/apps/cli/README.md#安装诊断)检查结果；未知项继续按本指南核对，不能宣布已就绪。

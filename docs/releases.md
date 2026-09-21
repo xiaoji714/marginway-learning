@@ -10,6 +10,8 @@
 
 `pnpm run version:check` 阻止版本漂移。`pnpm run package` 从该版本生成 ZIP 和 SHA-256，包内 build-info.json 记录 Git commit、dirty 状态、Node 与构建平台。安装包不包含依赖目录或数据库；仍需要安装指定 Node，尚非免运行时的原生安装包。
 
+当前尚无正式 Release 下载包；构建产物可用于安装，不等于已发布。未来下载已发布 ZIP 时仍需匹配 Node，Chrome 必须加载解压后的 extension 目录，不能直接加载 ZIP；步骤见[安装指南](installation.md)。
+
 ## 创建发布草稿
 
 在 GitHub Actions 手动运行 **Draft release**，选择 main，输入已合入的版本。流程先在 GitHub-hosted 三平台 runner 执行完整 CI，再下载该运行的 Linux 构建产物、校验 SHA-256 和版本，生成私有仓库内的 Release 草稿。不会自动正式发布；已有同名 Release 时创建失败，不覆盖旧产物。
@@ -20,4 +22,4 @@
 
 CI 包含真实 ZIP 解压、隔离目录安装、重新安装删除过时文件，以及移除安装介质后 CLI 数据仍可读取。Windows 烟测通过 `--skip-registration` 避免改写实际 Chrome 注册表，故不代表真实 Chrome 原生桥接注册和浏览器 UI 已跨平台验收。
 
-扩展 UI 目前由模拟 DOM/Chrome API 的测试与人工实测覆盖；真实 Chrome 自动化端到端验收仍是后续工作。每次 schema 改变需要单独提供旧版本 fixture 与升级/恢复验证，本轮 schema 保持 v1。
+扩展 UI 已有隔离 Chrome 端到端与视觉回归；真实 YouTube 兼容性仍单独验收，详见[测试契约](testing.md)。每次 schema 改变需要单独提供旧版本 fixture 与升级/恢复验证，本轮 schema 保持 v1。
