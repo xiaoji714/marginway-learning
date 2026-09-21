@@ -1,6 +1,6 @@
 import { test, expect, onTestFinished } from "vitest";
 import { JSDOM } from "jsdom";
-import { script } from "./support.js";
+import { evaluate } from "./support.js";
 import { readFileSync } from "node:fs";
 test.each(["success", "read-error", "write-error"])(
   "settings page handles %s without leaking keys into status",
@@ -33,8 +33,8 @@ test.each(["success", "read-error", "write-error"])(
         },
       },
     };
-    w.eval(script("settings"));
-    w.eval(script("options"));
+    evaluate(w, "settings");
+    evaluate(w, "options");
     await new Promise((r) => setTimeout(r, 0));
     const status = w.document.querySelector("#status");
     if (mode === "read-error") {

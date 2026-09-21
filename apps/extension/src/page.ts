@@ -15,6 +15,7 @@
     refreshSequence = 0,
     selectionSequence = 0;
   const requestedTranslations = new Set();
+  const translationErrors = new Map<string, string>();
   const pauses = new Map();
   let originallyPlaying = false;
   function pause(token: any) {
@@ -211,7 +212,8 @@
       );
     }
     const translated = body.querySelector(".translated");
-    const text = translations.get(a.id) || "正在翻译…";
+    const text =
+      translations.get(a.id) || translationErrors.get(a.id) || "正在翻译…";
     if (translated.textContent !== text) translated.textContent = text;
     const missing = anchors
       .slice(index, index + 4)
@@ -231,8 +233,10 @@
           if (resource?.id === rid) return refreshData();
         })
         .catch((e) => {
-          if (resource?.id === rid && body.dataset.anchor === a.id) {
-            translated.textContent = "翻译暂不可用：" + e.message;
+          if (resource?.id === rid) {
+            const message = "翻译暂不可用：" + e.message;
+            for (const item of missing) translationErrors.set(item.id, message);
+            if (body.dataset.anchor === a.id) translated.textContent = message;
           }
         });
     }
@@ -286,14 +290,8 @@
     fit();
   }
   async function selected(event: any, sequence: any) {
-    if (sequence !== selectionSequence) return;
-    if (activeCard && event.composedPath().includes(activeCard)) return;
-    const target = event.target;
-    if (
-      target?.isContentEditable ||
-      ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName)
-    )
-      return;
+    // The mouseup listener filters editable controls and card events before
+    // taking this immutable event-path snapshot. Freshness is checked after asynchronous lookups.
     const inSubs = event.composedPath().includes(host);
     const shadowSelection = inSubs ? root?.getSelection?.() : null;
     const sel = shadowSelection?.toString()
@@ -356,7 +354,7 @@
     )
       return;
     const sequence = ++selectionSequence,
-      snapshot = { target: path[0] || event.target, composedPath: () => path };
+      snapshot = { composedPath: () => path };
     // Capture text and anchor before asynchronous resource lookups or the next caption tick.
     void selected(snapshot, sequence);
   });
@@ -412,6 +410,7 @@
       anchors = [];
       translations.clear();
       requestedTranslations.clear();
+      translationErrors.clear();
       current = null;
       activeCard?.cleanup?.();
       activeCard?.remove();

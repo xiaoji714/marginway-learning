@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
-import { createContext, runInContext } from "node:vm";
-import { script } from "./support.js";
+import { runInContext } from "node:vm";
+import { script, createContext } from "./support.js";
 function fixture(
   reply: (url: string, body: any) => any,
   settings: Record<string, string> = {
@@ -120,5 +120,96 @@ test("translation batch preserves exact IDs and rejects missing/duplicate output
     expect(r.success).toBe(
       segments.length === 1 && segments[0]?.id === "a" && !!segments[0]?.text,
     );
+  }
+});
+
+test("provider rejects malformed text, batches and exhausted polling without paid retries", async () => {
+  for (const payload of [
+    {},
+    { choices: [] },
+    { choices: [{}] },
+    { choices: [{ message: {} }] },
+    { choices: [{ message: { content: 1 } }] },
+    { choices: [{ message: { content: "  " } }] },
+  ]) {
+    const { ctx } = fixture(() => response(payload));
+    await expect(
+      ctx.requestAiCompletion({ messages: [], maxTokens: 50, temperature: 0 }),
+    ).rejects.toThrow("模型未返回有效文本");
+  }
+  for (const content of [
+    {},
+    { segments: [] },
+    { segments: Array(5).fill({ id: "a", text: "x" }) },
+  ]) {
+    const { ctx, calls } = fixture(() => {
+      throw Error("must not call");
+    });
+    expect(
+      (await ctx.handleTranslateContent(content, "", "", "")).success,
+    ).toBe(false);
+    expect(calls).toHaveLength(0);
+  }
+  for (const text of [
+    "not JSON",
+    "{}",
+    '{"segments":[{"id":"a","text":1}]}',
+    '{"segments":[{"id":"a","text":"x"},{"id":"a","text":"y"}]}',
+  ]) {
+    const { ctx } = fixture(() =>
+      response({ choices: [{ message: { content: text } }] }),
+    );
+    const segments = text.includes('"y"')
+      ? [
+          { id: "a", text: "x" },
+          { id: "b", text: "y" },
+        ]
+      : [{ id: "a", text: "x" }];
+    expect(
+      (await ctx.handleTranslateContent({ segments }, "", "", "")).success,
+    ).toBe(false);
+  }
+  for (const data of [
+    { content: [] },
+    {
+      content: [
+        { text: 3, offset: 0 },
+        { text: "x", offset: "0" },
+      ],
+    },
+    { status: "failed" },
+    { status: "running" },
+  ]) {
+    let n = 0;
+    const { ctx, calls } = fixture(() =>
+      response(n++ === 0 ? { jobId: "a/b" } : data),
+    );
+    expect((await ctx.handleFetchTranscript("abcdefghijk")).success).toBe(
+      false,
+    );
+    expect(calls[1]!.url).toContain("a%2Fb");
+    expect(calls.length).toBe(data.status === "running" ? 41 : 2);
+  }
+  const { ctx } = fixture(() =>
+    response({ content: [{ text: "x", offset: 10, duration: -2 }] }),
+  );
+  expect((await ctx.handleFetchTranscript("abcdefghijk")).transcript).toEqual([
+    { text: "x", start: 0.01, duration: 0 },
+  ]);
+});
+
+test("settings normalize missing and invalid data without accepting arbitrary endpoints", () => {
+  const { ctx } = fixture(() => response({}));
+  for (const value of [
+    undefined,
+    null,
+    false,
+    "invalid",
+    { aiApiKey: 3, supadataApiKey: [] },
+  ]) {
+    const config = ctx.CONTEXT_SETTINGS.normalize(value);
+    expect(config.aiApiKey).toBe("");
+    expect(config.supadataApiKey).toBe("");
+    expect(config.aiBaseUrl).toBe("https://api.deepseek.com");
   }
 });

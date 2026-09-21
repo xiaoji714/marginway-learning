@@ -101,6 +101,7 @@ test("new, oversized and stale document budgets fail independently", (t) => {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);
   };
+  write(".local/browser-report/error-context.md", "generated browser evidence");
   write("README.md", "😀");
   write("scripts/doc-budgets.json", '{"README.md":1}');
   expect(() => verifyDocs(root)).not.toThrow();

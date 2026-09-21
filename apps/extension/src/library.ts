@@ -796,10 +796,9 @@ async function render() {
                     ];
     fragment.append(empty(copy[0], copy[1]));
   }
-  if (gen === renderGeneration) {
-    $("content").replaceChildren(fragment);
-    lastRenderKey = key;
-  }
+  // Every asynchronous iteration checks generation before appending.
+  $("content").replaceChildren(fragment);
+  lastRenderKey = key;
 }
 async function copyContext(note: any, container: any) {
   const anchorId = note.anchorId;

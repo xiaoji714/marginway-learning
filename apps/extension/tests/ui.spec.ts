@@ -1,4 +1,4 @@
-import { script } from "./support.js";
+import { evaluate } from "./support.js";
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
@@ -59,7 +59,7 @@ test("selection card binds notes and copied discussion to original anchor and pr
       },
     },
   });
-  w.eval(script("common"));
+  evaluate(w, "common");
   const card = w.LC.discussionCard({
     container: w.document.body,
     resource: r,
@@ -143,8 +143,8 @@ test("under-video captions follow playback, mount once and seek to captured node
   const video = w.document.querySelector("video");
   video.play = async () => {};
   video.pause = () => {};
-  w.eval(script("common"));
-  w.eval(script("page"));
+  evaluate(w, "common");
+  evaluate(w, "page");
   callbacks[0]();
   await pause(10);
   callbacks[0]();
@@ -222,8 +222,8 @@ test("resource detail survives database notifications and shows agent provenance
       }),
     },
   };
-  w.eval(script("common"));
-  w.eval(script("library"));
+  evaluate(w, "common");
+  evaluate(w, "library");
   await pause(10);
   w.document.querySelector('[data-view="resources.list"]').click();
   await pause(10);
@@ -269,8 +269,8 @@ test("deferred mouse selection preserves shadow path and does not reopen an acti
       }),
     },
   };
-  w.eval(script("common"));
-  w.eval(script("page"));
+  evaluate(w, "common");
+  evaluate(w, "page");
   w.getSelection = () => ({
     isCollapsed: false,
     toString: () => "word",
@@ -364,8 +364,8 @@ test("default bilingual captions keep one stable node through translation notifi
       },
     },
   };
-  w.eval(script("common"));
-  w.eval(script("page"));
+  evaluate(w, "common");
+  evaluate(w, "page");
   tick();
   await pause(30);
   const host = w.document.getElementById("learning-companion-subtitles"),
@@ -438,8 +438,8 @@ test("follow button immediately locates a paused current caption and panel loads
       },
     },
   };
-  w.eval(script("common"));
-  w.eval(script("panel"));
+  evaluate(w, "common");
+  evaluate(w, "panel");
   await pause(30);
   assert.equal(w.document.getElementById("load").hidden, true);
   assert.equal(w.document.getElementById("translate"), null);
@@ -496,8 +496,8 @@ test("review conceals the word and ratings until answer reveal, and feedback is 
       }),
     },
   };
-  w.eval(script("common"));
-  w.eval(script("library"));
+  evaluate(w, "common");
+  evaluate(w, "library");
   await pause(10);
   w.document.querySelector('[data-view="review"]').click();
   await pause(10);
@@ -536,8 +536,8 @@ test("late stats response cannot overwrite another library tab", async (t) => {
       }),
     },
   };
-  w.eval(script("common"));
-  w.eval(script("library"));
+  evaluate(w, "common");
+  evaluate(w, "library");
   await pause(10);
   w.document.querySelector('[data-view="stats"]').click();
   await pause(10);
@@ -580,8 +580,8 @@ test("selection popup stays within short viewport and releases resize handling o
       commonAncestorContainer: w.document.querySelector("p").firstChild,
     }),
   });
-  w.eval(script("common"));
-  w.eval(script("page"));
+  evaluate(w, "common");
+  evaluate(w, "page");
   w.document
     .querySelector("p")
     .dispatchEvent(
@@ -625,7 +625,7 @@ test("card freezes selected word and context; only the thought is editable", asy
       },
     },
   };
-  w.eval(script("common"));
+  evaluate(w, "common");
   const args = {
     container: w.document.body,
     resource: { id: "r", title: "Video" },
@@ -707,7 +707,7 @@ test("selection card expresses saved state on the button and removes duplicate c
       },
     },
   };
-  w.eval(script("common"));
+  evaluate(w, "common");
   const args = {
     container: w.document.body,
     resource: {
@@ -821,8 +821,8 @@ test("learning heatmap uses 365 local calendar days, paginated records and click
       },
     },
   };
-  w.eval(script("common"));
-  w.eval(script("library"));
+  evaluate(w, "common");
+  evaluate(w, "library");
   await pause(10);
   await pause(20);
   assert.equal(w.document.querySelector("[data-view]").dataset.view, "stats");
@@ -832,7 +832,10 @@ test("learning heatmap uses 365 local calendar days, paginated records and click
       .getAttribute("aria-current"),
     "page",
   );
-  assert.equal(w.document.querySelector("#breadcrumbs [aria-current=page]").textContent, "学习统计");
+  assert.equal(
+    w.document.querySelector("#breadcrumbs [aria-current=page]").textContent,
+    "学习统计",
+  );
   const cells = [...w.document.querySelectorAll(".activity-day")];
   assert.equal(cells.length, 365);
   assert.equal(new Set(cells.map((x) => x.dataset.date)).size, 365);
@@ -889,8 +892,8 @@ test("YouTube homepage with stale video title is not auto-registered by page pol
         ],
       },
     };
-    w.eval(script("common"));
-    w.eval(script(entry));
+    evaluate(w, "common");
+    evaluate(w, entry);
     await pause(10);
     await tick();
     await pause(10);
@@ -934,8 +937,8 @@ test("late video registration cannot overwrite sidebar after navigation to YouTu
     },
     tabs: { query: async () => [{ id: 1, url, title: "Video title" }] },
   };
-  w.eval(script("common"));
-  w.eval(script("panel"));
+  evaluate(w, "common");
+  evaluate(w, "panel");
   await pause(10);
   url = "https://www.youtube.com/";
   await tick();
@@ -1018,8 +1021,8 @@ test("library edits resources, words, context meanings and notes through the sto
       },
     },
   };
-  w.eval(script("common"));
-  w.eval(script("library"));
+  evaluate(w, "common");
+  evaluate(w, "library");
   const click = (text, scope = w.document) => {
     const b = [...scope.querySelectorAll("button")].find(
       (b) => b.textContent === text,
@@ -1155,7 +1158,10 @@ test("library edits resources, words, context meanings and notes through the sto
   );
   click("资料库", w.document.querySelector("#breadcrumbs"));
   await pause(20);
-  assert.equal(w.document.querySelector("#breadcrumbs [aria-current=page]").textContent, "学习统计");
+  assert.equal(
+    w.document.querySelector("#breadcrumbs [aria-current=page]").textContent,
+    "学习统计",
+  );
   assert.equal(w.document.querySelector("#query").value, "");
 });
 
@@ -1212,8 +1218,8 @@ test("library deletion confirms scope, preserves data on cancel and restores eac
       },
     },
   };
-  w.eval(script("common"));
-  w.eval(script("library"));
+  evaluate(w, "common");
+  evaluate(w, "library");
   const click = (text, scope = w.document) => {
     const b = [...scope.querySelectorAll("button")].find(
       (b) => b.textContent === text,
@@ -1271,7 +1277,10 @@ test("library deletion confirms scope, preserves data on cancel and restores eac
   assert.match(dialog().textContent, /全局词条与复习历史保留/);
   await confirm();
   assert.equal(run("resources.list").total, 0);
-  assert.equal(w.document.querySelector("#breadcrumbs [aria-current=page]").textContent, "全部资源");
+  assert.equal(
+    w.document.querySelector("#breadcrumbs [aria-current=page]").textContent,
+    "全部资源",
+  );
   assert.equal(run("notes.list").total, 0);
   await restore();
   click("单词簿");
@@ -1358,8 +1367,8 @@ test("library discussion focuses the clicked note or vocabulary occurrence inste
       },
     },
   };
-  w.eval(script("common"));
-  w.eval(script("library"));
+  evaluate(w, "common");
+  evaluate(w, "library");
   await pause(20);
   w.document.querySelector('[data-view="notes.list"]').click();
   await pause(20);
