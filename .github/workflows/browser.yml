@@ -27,6 +27,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-noto-cjk xvfb libasound2t64 libatk-bridge2.0-0 libgtk-3-0 libnss3
           curl --fail --location --output /tmp/chrome.zip https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.52/linux64/chrome-linux64.zip
+          # Fingerprint of this fixed archive downloaded from the official Google URL.
+          echo "e66f66d4802a46d4a022667e668aa950e277cadbfbed4b3777915b47413a0ef9  /tmp/chrome.zip" | sha256sum -c -
           unzip -q /tmp/chrome.zip -d .local
       - name: Browser flows with visual checkpoints
         env:
