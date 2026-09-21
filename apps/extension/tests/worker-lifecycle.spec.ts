@@ -378,3 +378,167 @@ test.each([
     f.calls.find((x) => x.command === "jobs.complete").params.error,
   ).toBeTruthy();
 });
+
+test("page RPC authorizes resource, anchor and record identities before dispatch", async () => {
+  const f = fixture((cmd, p) => {
+    if (cmd === "resources.list")
+      return { items: [{ id: "r", url: "https://example.com/" }], next: null };
+    if (cmd === "records.get")
+      return p.id === "r"
+        ? { id: "r" }
+        : p.id === "a"
+          ? { id: "a", resourceId: "r" }
+          : { id: "foreign", resourceId: "other" };
+    if (cmd === "notes.append") throw Error("database rejected");
+    return {};
+  });
+  await tick();
+  const sender = { tab: { id: 1 }, url: "https://example.com/", frameId: 0 };
+  expect(
+    (await f.request({ lc: "rpc", command: "stats" }, sender)).error,
+  ).toContain("页面不可");
+  expect(
+    (await f.request({ lc: "rpc", command: "notes.list" }, sender)).ok,
+  ).toBe(true);
+  expect(
+    (
+      await f.request(
+        { lc: "rpc", command: "notes.list", params: { resourceId: "other" } },
+        sender,
+      )
+    ).error,
+  ).toContain("资源不属于");
+  expect(
+    (
+      await f.request(
+        { lc: "rpc", command: "notes.append", params: { anchorId: "foreign" } },
+        sender,
+      )
+    ).error,
+  ).toContain("位置不属于");
+  expect(
+    (
+      await f.request(
+        { lc: "rpc", command: "notes.append", params: { anchorId: "a" } },
+        sender,
+      )
+    ).error,
+  ).toBe("database rejected");
+  for (const id of ["a", "r", "foreign"]) {
+    const reply = await f.request(
+      { lc: "rpc", command: "records.get", params: { id } },
+      sender,
+    );
+    expect(reply.ok).toBe(id !== "foreign");
+  }
+  for (const url of [
+    "file:///private",
+    "https://user@example.com/",
+    "https://:pass@example.com/",
+    "https://www.youtube.com/watch",
+    "https://www.youtube.com/watch?v=bad",
+  ]) {
+    const reply = await f.request({
+      lc: "rpc",
+      command: "resources.upsert",
+      params: { url },
+    });
+    expect(reply.ok).toBe(false);
+  }
+  f.poll();
+  await tick();
+});
+
+test("whole-translation scheduling paginates, suppresses duplicates and retries failed discovery", async () => {
+  let failures = 1;
+  let resourceType = "video";
+  const queued: any[] = [];
+  const f = fixture((cmd, p) => {
+    if (cmd === "jobs.submit") {
+      if (p.anchorIds) queued.push(p);
+      return { resourceId: "r" };
+    }
+    if (cmd === "records.get") {
+      if (failures-- > 0) throw Error("temporary read failure");
+      return { type: resourceType };
+    }
+    if (cmd === "anchors.list")
+      return p.offset === 0
+        ? { items: [{ id: "a", start: 0 }], next: 1 }
+        : {
+            items: [
+              { id: "b", start: 10 },
+              { id: "web", start: null },
+            ],
+            next: null,
+          };
+    if (cmd === "translations.list") return { items: [], next: null };
+    return null;
+  });
+  await tick();
+  const submit = () =>
+    f.request({
+      lc: "rpc",
+      command: "jobs.submit",
+      params: { type: "translate" },
+    });
+  await submit();
+  await tick();
+  await submit();
+  await tick();
+  expect(queued).toHaveLength(1);
+  expect(queued[0].anchorIds).toEqual(["a", "b"]);
+  await submit();
+  await tick();
+  expect(queued).toHaveLength(1);
+  await f.request({
+    lc: "rpc",
+    command: "jobs.submit",
+    params: { type: "lookup" },
+  });
+  const web = fixture((cmd) =>
+    cmd === "jobs.submit"
+      ? { resourceId: "web" }
+      : cmd === "records.get"
+        ? { type: "web" }
+        : null,
+  );
+  await web.request({
+    lc: "rpc",
+    command: "jobs.submit",
+    params: { type: "translate" },
+  });
+  await tick();
+  expect(web.calls.some((m) => m.command === "anchors.list")).toBe(false);
+});
+
+test("closed side panel and rejected job completion do not escape the worker loop", async () => {
+  let claimed = false;
+  const f = fixture((cmd) => {
+    if (cmd === "jobs.claim") {
+      if (claimed) return null;
+      claimed = true;
+      return { id: "j", type: "lookup", resourceId: "r", anchorIds: ["a"] };
+    }
+    if (cmd === "jobs.complete") throw Error("cancelled while processing");
+    return {};
+  });
+  f.sandbox.requestAiCompletion = async () => {
+    throw Error("provider failed");
+  };
+  f.chrome.sidePanel.open = async () => {
+    throw Error("closed");
+  };
+  f.send({ lc: "open" }, { tab: { id: 1 } });
+  await tick();
+  await tick();
+  expect(
+    f.calls.some(
+      (m) =>
+        m.command === "jobs.complete" && m.params.error === "provider failed",
+    ),
+  ).toBe(true);
+  f.poll();
+  await tick();
+  expect(f.calls.filter((m) => m.command === "jobs.claim")).toHaveLength(2);
+});

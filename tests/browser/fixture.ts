@@ -22,6 +22,7 @@ export const test = base.extend<{
     resourceId: string;
     anchorId: string;
     cli: (command: string, params?: object) => any;
+    metadataRequests: string[];
   };
 }>({
   fixture: async ({}, use, testInfo) => {
@@ -153,13 +154,21 @@ export const test = base.extend<{
           "--model",
           "test",
         ],
-        { encoding: "utf8", env: { ...process.env, LC_DATA_DIR: data } },
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            LC_DATA_DIR: data,
+            LC_TEST_NOW: "2026-09-21T00:01:00Z",
+          },
+        },
       );
       if (p.status !== 0) throw Error(p.stderr);
       return JSON.parse(p.stdout).result;
     };
     let context: BrowserContext | undefined;
     const paidRequests: string[] = [];
+    const metadataRequests: string[] = [];
     try {
       context = await chromium.launchPersistentContext(
         join(directory, "profile"),
@@ -177,6 +186,13 @@ export const test = base.extend<{
           ],
         },
       );
+      context.on("request", (request) => {
+        const url = new URL(request.url());
+        if (["api.deepseek.com", "api.supadata.ai"].includes(url.hostname))
+          paidRequests.push(url.href);
+        if (url.hostname === "www.youtube.com" && url.pathname === "/oembed")
+          metadataRequests.push(url.href);
+      });
       await context.addInitScript(
         ({ now }) => {
           const Original = Date;
@@ -242,16 +258,18 @@ export const test = base.extend<{
         resourceId: resource.id,
         anchorId: anchors[0]!.id,
         cli,
+        metadataRequests,
       });
       expect(
         paidRequests,
         "cached workflows must not contact paid providers",
       ).toEqual([]);
       expect(
-        cli("jobs.list").items.filter((j: any) =>
-          ["transcript", "lookup"].includes(j.type),
-        ),
+        cli("jobs.list").items.filter((j: any) => j.type === "transcript"),
       ).toHaveLength(0);
+      expect(
+        cli("jobs.list").items.filter((j: any) => j.type === "lookup"),
+      ).toHaveLength(1);
     } finally {
       await context?.close();
       rmSync(directory, { recursive: true, force: true });

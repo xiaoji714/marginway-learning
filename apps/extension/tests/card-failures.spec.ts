@@ -170,3 +170,80 @@ test("job waiter handles cancelled, error and timeout, with queued status callba
   expect(statuses).toHaveLength(240);
   expect(polls).toBe(242);
 });
+
+test("completed lookup goes into the short discussion request and redundant collect events are harmless", async (t) => {
+  const calls: any[] = [];
+  let occurrences: any;
+  const { create, w } = fixture(t, (m) => {
+    calls.push(m);
+    if (m.command === "occurrences.list")
+      return new Promise((r) => (occurrences = r));
+    if (m.command === "jobs.submit") return { id: "j" };
+    if (m.command === "jobs.get") return { status: "done", result: "释义" };
+    if (m.command === "discussions.create") return { id: "d" };
+    if (m.command === "context.export") return { prompt: "short" };
+    return {};
+  });
+  const card = create();
+  await expect
+    .poll(() => card.querySelector(".lc-definition")?.textContent)
+    .toBe("释义");
+  button(card, "在 Agent").click();
+  await tick();
+  expect(
+    calls.find((m) => m.command === "discussions.create").params
+      .selectionTranslation,
+  ).toBe("释义");
+  button(card, "收藏单词").click();
+  await tick();
+  occurrences({ items: [], next: null });
+  await tick();
+  const collect = button(card, "已收藏");
+  collect.dispatchEvent(new w.MouseEvent("click"));
+  await tick();
+  expect(calls.filter((m) => m.command === "vocabulary.save")).toHaveLength(1);
+});
+
+test("disposed card ignores pending lookup submission, rejection and already queued callbacks", async (t) => {
+  for (const mode of [
+    "submission",
+    "lookup-reject",
+    "save-reject",
+    "callback",
+  ]) {
+    let resolvePending: any, rejectPending: any;
+    let scheduled: any;
+    const { create, w } = fixture(t, (m) => {
+      if (m.command === "occurrences.list") return { items: [], next: null };
+      if (
+        (mode === "submission" && m.command === "jobs.submit") ||
+        (mode === "lookup-reject" && m.command === "jobs.get") ||
+        (mode === "save-reject" && m.command === "notes.append")
+      )
+        return new Promise((resolve, reject) => {
+          resolvePending = resolve;
+          rejectPending = reject;
+        });
+      return { id: "j", status: "done", result: "word" };
+    });
+    if (mode === "callback")
+      w.setTimeout = (fn: any) => {
+        scheduled = fn;
+        return 1;
+      };
+    const card = create();
+    if (mode === "save-reject") {
+      card.querySelector("textarea").value = "thought";
+      button(card, "保存笔记").click();
+    }
+    if (mode !== "callback")
+      await expect.poll(() => !!resolvePending).toBe(true);
+    button(card, "关闭").click();
+    if (mode === "submission") resolvePending({ id: "j" });
+    else if (mode === "callback") scheduled();
+    else rejectPending(Error("late failure"));
+    await tick();
+    expect(card.isConnected).toBe(false);
+    expect(card.textContent).not.toContain("late failure");
+  }
+});

@@ -15,6 +15,7 @@
     refreshSequence = 0,
     selectionSequence = 0;
   const requestedTranslations = new Set();
+  const translationErrors = new Map<string, string>();
   const pauses = new Map();
   let originallyPlaying = false;
   function pause(token: any) {
@@ -211,7 +212,8 @@
       );
     }
     const translated = body.querySelector(".translated");
-    const text = translations.get(a.id) || "正在翻译…";
+    const text =
+      translations.get(a.id) || translationErrors.get(a.id) || "正在翻译…";
     if (translated.textContent !== text) translated.textContent = text;
     const missing = anchors
       .slice(index, index + 4)
@@ -231,8 +233,10 @@
           if (resource?.id === rid) return refreshData();
         })
         .catch((e) => {
-          if (resource?.id === rid && body.dataset.anchor === a.id) {
-            translated.textContent = "翻译暂不可用：" + e.message;
+          if (resource?.id === rid) {
+            const message = "翻译暂不可用：" + e.message;
+            for (const item of missing) translationErrors.set(item.id, message);
+            if (body.dataset.anchor === a.id) translated.textContent = message;
           }
         });
     }
@@ -412,6 +416,7 @@
       anchors = [];
       translations.clear();
       requestedTranslations.clear();
+      translationErrors.clear();
       current = null;
       activeCard?.cleanup?.();
       activeCard?.remove();

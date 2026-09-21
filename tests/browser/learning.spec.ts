@@ -9,6 +9,10 @@ test("paused video → note → library → Agent writeback, with visual checkpo
   const caption = page.getByRole("region", { name: "语境双语字幕" });
   // section has an accessible name and implicit region role.
   await expect(caption).toContainText("语境让学习更有意义");
+  expect(fixture.metadataRequests.length).toBeGreaterThan(0);
+  expect(new URL(fixture.metadataRequests[0]!).searchParams.get("url")).toBe(
+    videoUrl,
+  );
   await expect(page.locator("#learning-companion-subtitles")).toHaveCount(1);
   await expect(page.locator("video")).toHaveJSProperty("paused", true);
   await expect(caption).toHaveScreenshot("paused-bilingual.png");

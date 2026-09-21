@@ -242,18 +242,6 @@ function card(anchor: any, selected: any) {
     close: () => dialog.remove(),
   });
 }
-async function translate(ids: any) {
-  $("status").textContent = "正在翻译…";
-  for (let i = 0; i < ids.length; i += 4) {
-    const j = await api("jobs.submit", {
-      type: "translate",
-      resourceId: resource.id,
-      anchorIds: ids.slice(i, i + 4),
-    });
-    await waitJob(j.id);
-  }
-  await refresh();
-}
 $("load").onclick = () => {
   if (pendingOrigin) {
     chrome.permissions
