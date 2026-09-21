@@ -47,4 +47,7 @@ node runtime/install.js --extension-id <扩展ID> --extension-dir "<Chrome加载
 
 升级先导出学习备份，用新的完整包重复第 4 步安装命令，保持目录与 ID 一致，再重新加载扩展。安装器会备份旧扩展文件；不会删除 SQLite。切换 Chrome 加载目录可能改变 ID，必须用新 ID 重装桥接；卸载扩展会清除该扩展的密钥配置，迁移前自行保留密钥。
 
-无法连接时，核对 Node 仍存在、Chrome ID 与安装参数一致，然后用当前包重新运行安装器并重载扩展。请勿通过删除资料库解决连接问题。当前安装日志为人类文本；统一 JSON 诊断尚在[目标方案](runtime-installation-design.md)中，不能调用尚未实现的命令。
+无法连接时，核对 Node 仍存在、Chrome ID 与安装参数一致，然后用当前包重新运行安装器并重载扩展。请勿通过删除资料库解决连接问题。
+## Agent 诊断
+
+CLI 启动前，Agent 检查 Node 版本和 Node/CLI 绝对路径；运行构建包不需要 Git/pnpm。CLI 可运行后执行 `learning doctor`，根据[诊断契约](https://github.com/xiaoji714/marginway-learning/blob/main/apps/cli/README.md#安装诊断)检查结果；未知项继续按本指南核对，不能宣布已就绪。
