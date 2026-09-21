@@ -1,6 +1,6 @@
 # 贡献指南
 
-使用 Node 22.23.2 与 pnpm 11.22.0，从 lockfile 安装依赖。所有源码使用 TypeScript。
+使用满足 package.json engines 的 Node 与 pnpm 11.22.0；CI/复现基线见 .node-version，无需强制替换兼容环境。从 lockfile 安装依赖。所有源码使用 TypeScript。
 
 先用简短 Issue 说明用户遇到的问题，再从独立分支/worktree 提交 PR。PR 描述最终行为、验证方式和限制；非平凡改动附 Agent Note。main 不直接提交。Issue 状态、标签、评审与合并规则见 [开发流程](docs/development-process.md)。
 

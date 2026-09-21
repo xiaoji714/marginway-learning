@@ -13,7 +13,7 @@
 
 ## 技术基线
 
-TypeScript 源码、pnpm workspace、Node 22.23.2、Vitest + V8、tsc、esbuild、Lefthook。`src/` 是源码，`lib/` 是不入 git 的机械产物。所有包启用 strict 与 noUncheckedIndexedAccess，不允许 ts-ignore/nocheck。动态 RPC 负载在运行时按命令校验，因此 RecordData 保留 JSON 字段扩展能力；这不代替边界验证。
+TypeScript 源码、pnpm workspace、Node（开发基线见 .node-version）、Vitest + V8、tsc、esbuild、Lefthook。`src/` 是源码，`lib/` 是不入 git 的机械产物。所有包启用 strict 与 noUncheckedIndexedAccess，不允许 ts-ignore/nocheck。RPC 负载按命令校验，RecordData 扩展性不代替边界验证。
 
 核心/CLI/Native Host 使用 tsc 输出 ESM、声明与 source map；浏览器入口用 esbuild 输出 Chrome 116+ 可执行脚本。发布时将 Node 入口 bundle 成无需 workspace 的 ESM，SQLite 使用 Node 内置模块。
 
