@@ -100,6 +100,7 @@ function fixture({
     setActive: (v: any) => (active = v),
     setDenied: (v: boolean) => (denied = v),
     setNotes: (v: any[]) => (notes = v),
+    setAnchors: (v: any[]) => (anchors = v),
     setTranslations: (v: any[]) => (translations = v),
     scrolls: () => scrolls,
   };
@@ -200,4 +201,180 @@ test("uncached transcript requests once and displays errors; non-web tabs do not
   ).toHaveLength(1);
   f.setActive(null);
   await f.poll();
+});
+
+test.each(["active", "activate", "activate-reject", "anchors", "transcript"])(
+  "navigation invalidates stale %s results",
+  async (phase) => {
+    const f = fixture();
+    await tick();
+    await tick();
+    let release: any;
+    let held = false;
+    let queries = 0;
+    const original = f.chrome.runtime.sendMessage;
+    const originalQuery = f.chrome.tabs.query;
+    f.chrome.tabs.query = async () => {
+      const value = await originalQuery();
+      if (phase === "active" && ++queries === 2 && !held) {
+        held = true;
+        return new Promise((resolve) => (release = () => resolve(value)));
+      }
+      return value;
+    };
+    if (phase === "transcript") f.setAnchors([]);
+    f.chrome.runtime.sendMessage = async (m: any) => {
+      const matches =
+        (phase.startsWith("activate") && m.lc === "activate") ||
+        (phase === "anchors" && m.command === "anchors.list") ||
+        (phase === "transcript" && m.command === "jobs.get");
+      if (matches && !held) {
+        held = true;
+        const value = await original(m);
+        return new Promise(
+          (resolve) =>
+            (release = () =>
+              resolve(
+                phase === "activate-reject"
+                  ? { ok: false, error: "stale denied" }
+                  : value,
+              )),
+        );
+      }
+      return original(m);
+    };
+    f.setActive({
+      id: 2,
+      url: "https://www.youtube.com/watch?v=second12345",
+      title: "Second",
+    });
+    const pending = f.poll();
+    await expect.poll(() => !!release).toBe(true);
+    f.setActive({ id: 3, url: "https://www.youtube.com/", title: "Home" });
+    await f.poll();
+    release();
+    await pending;
+    await tick();
+    expect(f.w.document.querySelector("#title").textContent).toContain(
+      "打开一个 YouTube 视频",
+    );
+    expect(f.w.document.querySelector("#timeline").textContent).toBe("");
+    f.changed();
+    await tick();
+    await tick();
+  },
+);
+
+test("stale refresh and playback responses cannot restore an earlier resource", async () => {
+  const f = fixture();
+  await tick();
+  await tick();
+  const original = f.chrome.runtime.sendMessage;
+  let release: any;
+  f.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "notes.list"
+      ? new Promise(
+          (resolve) =>
+            (release = () =>
+              resolve({ ok: true, result: { items: [], next: null } })),
+        )
+      : original(m);
+  f.changed();
+  await expect.poll(() => !!release).toBe(true);
+  f.setActive({ id: 2, url: "https://www.youtube.com/" });
+  await f.poll();
+  release();
+  await tick();
+  expect(f.w.document.querySelector("#timeline").textContent).toBe("");
+  f.chrome.runtime.sendMessage = original;
+  f.setActive({ id: 3, url: "https://www.youtube.com/watch?v=third12345" });
+  await f.poll();
+  f.chrome.tabs.sendMessage = () =>
+    new Promise((resolve) => (release = () => resolve({ seconds: 0 })));
+  const pending = f.poll();
+  await tick();
+  f.setActive({ id: 4, url: "https://www.youtube.com/" });
+  await f.poll();
+  release();
+  await pending;
+  expect(f.w.document.querySelector("#timeline").textContent).toBe("");
+});
+
+test("web excerpts, no selection, missing progress and denied page messaging are handled", async () => {
+  const f = fixture({
+    anchors: [
+      { id: "a", start: null, quote: "Web quote" },
+      { id: "b", start: 10, quote: "Second quote" },
+    ],
+  });
+  await tick();
+  await tick();
+  const d = f.w.document;
+  const node = d.querySelector(".node");
+  node
+    .querySelector("button")
+    .dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+  f.w.getSelection = () => null;
+  node.dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+  expect(d.querySelector(".dialog")).toBeNull();
+  f.chrome.tabs.sendMessage = async () => ({ seconds: -1 });
+  await f.poll();
+  f.setTranslations([]);
+  f.changed();
+  await tick();
+  await tick();
+  f.changed();
+  await tick();
+  await tick();
+  d.querySelector("#translation-progress").remove();
+  f.changed();
+  await tick();
+  await tick();
+  const original = f.chrome.runtime.sendMessage;
+  f.chrome.runtime.sendMessage = async (m: any) =>
+    ["pause", "resume", "seek"].includes(m.lc)
+      ? { ok: false, error: "tab disappeared" }
+      : original(m);
+  d.querySelector(".time").click();
+  await tick(); // second node's seek
+  expect(d.querySelector("#status").className).toContain("error");
+  const second = d.querySelectorAll(".node")[1];
+  Array.from(second.querySelectorAll("button"))
+    .find((b: any) => b.textContent === "记笔记")!
+    .click();
+  await tick();
+  const dialog = d.querySelector(".dialog");
+  Array.from(dialog.shadowRoot.querySelectorAll("button"))
+    .find((b: any) => b.textContent === "关闭")!
+    .click();
+  await tick();
+  const permission = fixture({ url: "https://example.com/", denied: true });
+  await tick();
+  permission.chrome.permissions.request = async () => {
+    throw "permission failure";
+  };
+  permission.w.document.querySelector("#load").click();
+  await tick();
+  expect(permission.w.document.querySelector("#status").textContent).toBe(
+    "permission failure",
+  );
+});
+
+test("untimed excerpt ordering and paused current-node transitions do not force repeated scrolling", async () => {
+  const f = fixture({
+    anchors: [
+      { id: "a", start: null, quote: "A" },
+      { id: "b", start: null, quote: "B" },
+      { id: "c", start: 0, quote: "C" },
+      { id: "d", start: 10, quote: "D" },
+    ],
+  });
+  await tick();
+  await tick();
+  f.chrome.tabs.sendMessage = async () => ({ seconds: 12 });
+  await f.poll();
+  const scrolled = f.scrolls();
+  await f.poll();
+  expect(f.scrolls()).toBe(scrolled);
+  expect(f.w.document.querySelector(".node.active").dataset.id).toBe("d");
 });

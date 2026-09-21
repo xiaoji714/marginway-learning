@@ -290,14 +290,8 @@
     fit();
   }
   async function selected(event: any, sequence: any) {
-    if (sequence !== selectionSequence) return;
-    if (activeCard && event.composedPath().includes(activeCard)) return;
-    const target = event.target;
-    if (
-      target?.isContentEditable ||
-      ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName)
-    )
-      return;
+    // The mouseup listener filters editable controls and card events before
+    // taking this immutable event-path snapshot. Freshness is checked after asynchronous lookups.
     const inSubs = event.composedPath().includes(host);
     const shadowSelection = inSubs ? root?.getSelection?.() : null;
     const sel = shadowSelection?.toString()
@@ -360,7 +354,7 @@
     )
       return;
     const sequence = ++selectionSequence,
-      snapshot = { target: path[0] || event.target, composedPath: () => path };
+      snapshot = { composedPath: () => path };
     // Capture text and anchor before asynchronous resource lookups or the next caption tick.
     void selected(snapshot, sequence);
   });

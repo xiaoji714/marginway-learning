@@ -16,7 +16,7 @@
     "doc-sync": "tsx scripts/doc-sync.ts",
     "package": "pnpm run build && pnpm run package:built",
     "install:local": "tsx scripts/install.ts",
-    "ci": "pnpm run version:check && pnpm run build && pnpm run typecheck:built && pnpm run coverage:built && pnpm run check && pnpm run test:packages && pnpm run doc-sync && pnpm run package:built && pnpm run test:release",
+    "ci": "pnpm run version:check && pnpm run build && pnpm run typecheck:built && pnpm run coverage:built && pnpm run runtime-coverage:built && pnpm run check && pnpm run test:packages && pnpm run doc-sync && pnpm run package:built && pnpm run test:release",
     "postinstall": "tsx scripts/install-hooks.ts",
     "test:skills": "pnpm run build && vitest run scripts/test/skill.spec.ts scripts/test/skill-tasks.spec.ts",
     "test:release": "tsx scripts/smoke-release.ts",
@@ -28,7 +28,8 @@
     "test:packages": "tsx scripts/verify-package-tests.ts",
     "test:runtime-coverage": "pnpm run build && tsx scripts/runtime-coverage.ts",
     "test:runtime-report": "pnpm run build && tsx scripts/runtime-coverage.ts --report-only",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "runtime-coverage:built": "tsx scripts/runtime-coverage.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

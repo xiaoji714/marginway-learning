@@ -284,10 +284,11 @@ async function syncPlayback(force = false) {
   const rid = resource.id;
   const result = await chrome.tabs.sendMessage(tab.id, { lc: "time" });
   if (rid !== resource?.id) return;
-  const current = anchors.find(
+  const timed = anchors.filter((a: any) => a.start != null);
+  const current = timed.find(
     (a: any, i: any) =>
       a.start <= result.seconds &&
-      (!anchors[i + 1] || anchors[i + 1].start > result.seconds),
+      (!timed[i + 1] || timed[i + 1].start > result.seconds),
   );
   if (!current) return;
   for (const n of document.querySelectorAll<HTMLElement>(".node")) {
