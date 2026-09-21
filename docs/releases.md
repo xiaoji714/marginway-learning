@@ -10,7 +10,7 @@
 
 `pnpm run version:check` 阻止版本漂移。`pnpm run package` 从该版本生成 ZIP 和 SHA-256，包内 build-info.json 记录 Git commit、dirty 状态、Node 与构建平台。安装包不包含依赖目录或数据库；仍需要兼容的外部 Node，尚非免运行时的原生安装包。
 
-当前尚无正式 Release 下载包；构建产物可用于安装，不等于已发布。未来下载已发布 ZIP 时仍需满足[运行要求](installation.md#准备与构建)，Chrome 必须加载解压后的 extension 目录，不能直接加载 ZIP；步骤见[安装指南](installation.md)。
+从 [Releases](https://github.com/xiaoji714/marginway-learning/releases/latest) 获取正式 ZIP 和 SHA-256（私有仓库需授权）。下载后仍需满足[运行要求](installation.md#准备与构建)，Chrome 必须加载解压后的 extension 目录，不能直接加载 ZIP；步骤见[安装指南](installation.md)。
 
 ## 创建发布草稿
 
