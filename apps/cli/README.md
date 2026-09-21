@@ -9,6 +9,19 @@
 
 复习中 feedbackSource=user-confirmed 表示转述用户实际反馈，保留 Agent 来源且计入学习活动；这是调用方声明，不是认证。旧 Agent 复习不自动改写。
 
+## 安装诊断
+
+CLI 无法启动时，按[安装指南](../../docs/installation.md)先核对 Node 版本及绝对路径。
+
+运行 `learning doctor`（必要时用完整路径），默认 JSON；`--json` 是输入参数，不是输出开关。诊断不建库、不读密钥、不调用服务：
+
+- DATABASE_MISSING：核对原数据目录与安装进度，不另建空库替代。
+- DATABASE_UNREADABLE：检查权限、文件及备份，不删除库。
+- HEARTBEAT_METADATA_INVALID：历史心跳损坏，重新连接扩展后复查，不据此判定数据库不可读。
+- DATABASE_READABLE：只证明相关表可读，不证明完整性或可写性。
+
+注册、实时连接和配置仍为 unknown：核对扩展 ID 与 Native manifest 的 allowed_origins/启动路径，再打开扩展检查连接、在设置填密钥。历史心跳不是实时握手；ok 只表示诊断成功，readiness=unknown 不能当作安装完成。自动修复仍见[目标方案](../../docs/runtime-installation-design.md)。
+
 ## token 影响
 
 核心、CLI与桥接不调用模型。扩展只在字幕翻译与用户划词时向已配置服务发送所需上下文；相同任务使用 SQLite 缓存。

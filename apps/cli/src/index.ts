@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { openStore } from "@context/core";
+import { openStore, DATA_DIR } from "@context/core";
+import { DatabaseSync } from "node:sqlite";
 const args = process.argv.slice(2);
 const cmd = args.shift() || "capabilities";
 const allowed = new Set(["--input", "--json", "--actor", "--model"]);
@@ -40,7 +41,7 @@ try {
     result = {
       usage:
         "learning <command> [--input <file|-> | --json <object>] [--actor <client>] [--model <model>]",
-      discovery: ["capabilities", "status", "skill", "--version"],
+      discovery: ["doctor", "capabilities", "status", "skill", "--version"],
       writes:
         "commands declaring operationId require a nonempty ID; reuse it and identical input on retry",
       setup:
@@ -57,6 +58,84 @@ try {
           "utf8",
         ),
       ).version,
+    };
+  } else if (cmd === "doctor") {
+    const database = join(DATA_DIR, "learning.sqlite");
+    const checks: { id: string; status: string; code: string }[] = [];
+    let lastHeartbeat: unknown = null;
+    let db: DatabaseSync | undefined;
+    if (!existsSync(database)) {
+      checks.push({
+        id: "database",
+        status: "unknown",
+        code: "DATABASE_MISSING",
+      });
+    } else {
+      try {
+        db = new DatabaseSync(database, { readOnly: true });
+        db.prepare("SELECT id FROM objects LIMIT 0").all();
+        const row = db
+          .prepare("SELECT value FROM meta WHERE key='bridge'")
+          .get();
+        checks.push({
+          id: "database",
+          status: "pass",
+          code: "DATABASE_READABLE",
+        });
+        if (row) {
+          try {
+            const heartbeat = JSON.parse(String(row.value));
+            if (typeof heartbeat?.at === "string") lastHeartbeat = heartbeat.at;
+          } catch {
+            checks.push({
+              id: "heartbeat",
+              status: "fail",
+              code: "HEARTBEAT_METADATA_INVALID",
+            });
+          }
+        }
+      } catch {
+        checks.push({
+          id: "database",
+          status: "fail",
+          code: "DATABASE_UNREADABLE",
+        });
+      } finally {
+        db?.close();
+      }
+    }
+    result = {
+      schemaVersion: 1,
+      checkedAt: new Date().toISOString(),
+      readiness: "unknown",
+      runtime: {
+        node: process.versions.node,
+        executablePath: process.execPath,
+        platform: process.platform,
+        arch: process.arch,
+      },
+      database,
+      lastHeartbeat,
+      checks: [
+        ...checks,
+        {
+          id: "nativeRegistration",
+          status: "unknown",
+          code: "MANUAL_CHECK_REQUIRED",
+        },
+        {
+          id: "browserConnection",
+          status: "unknown",
+          code: "LIVE_PROBE_NOT_IMPLEMENTED",
+        },
+        {
+          id: "providerConfiguration",
+          status: "unknown",
+          code: "CHECK_IN_EXTENSION",
+        },
+      ],
+      guidance:
+        "Read the Skill and installation guide. Compare Node with the required version; verify the exact Chrome ID and native registration, then open the extension and check configuration there. Historical heartbeat is not proof of a live connection. Never delete the database to repair installation.",
     };
   } else if (cmd === "skill") {
     const path = [
