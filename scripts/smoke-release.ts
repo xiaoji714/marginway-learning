@@ -96,17 +96,29 @@ try {
   assert.equal(installed.status, 0, installed.stderr);
   const env = { ...process.env, LC_DATA_DIR: join(temp, "data") };
   const cli = join(home, ".local/share/learning-companion/runtime/learning.js");
+  const launcher = join(home, ".local/bin/learning");
   const run = (...args: string[]) => {
-    const p = spawnSync(runtimeNode, ["--no-warnings", cli, ...args], {
-      encoding: "utf8",
-      env,
-    });
+    // POSIX exercises the installed entrypoint and its bound Node path.
+    // Windows keeps the direct runtime smoke; cmd launch remains a separate check.
+    const windows = process.platform === "win32";
+    const p = spawnSync(
+      windows ? runtimeNode : launcher,
+      windows ? ["--no-warnings", cli, ...args] : args,
+      {
+        encoding: "utf8",
+        env,
+      },
+    );
     assert.equal(p.status, 0, p.stderr);
     return JSON.parse(p.stdout).result;
   };
   // Prove the installed CLI does not depend on the extracted media or source checkout.
 
   assert(run("capabilities").commands["notes.append"]);
+  assert.equal(
+    realpathSync(run("doctor").runtime.executablePath),
+    realpathSync(runtimeNode),
+  );
   const r = run(
     "resources.upsert",
     "--json",
