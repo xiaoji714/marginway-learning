@@ -46,6 +46,33 @@
     }
     throw new Error("任务仍在执行，可在资料库查看状态");
   }
+  const isCaption = (a: DataRecord) =>
+    a.origin === "import" &&
+    a.createdBy?.id === "supadata" &&
+    Number.isFinite(a.start);
+  function captionFailure(
+    container: HTMLElement,
+    message: string,
+    retry: () => unknown,
+    resource: DataRecord,
+  ) {
+    const box = el("div", null, "lc-caption-error");
+    box.setAttribute("role", "alert");
+    box.style.cssText = "line-height:1.6;overflow-wrap:anywhere;color:#963e32";
+    box.append(el("strong", "字幕获取失败"), el("p", message));
+    const actions = el("div", null, "lc-row");
+    actions.style.cssText =
+      "display:flex;flex-wrap:wrap;gap:8px;margin-top:12px";
+    const copy = button("复制诊断信息", async () => {
+      const text = `Marginway 字幕诊断\n视频：${resource.url}\n阶段：获取原生字幕\n错误：${message}`;
+      copy.textContent = (await clipboard(text, box))
+        ? "已复制"
+        : "复制失败，请重试";
+    });
+    actions.append(button("重试获取", retry), copy);
+    box.append(actions);
+    container.replaceChildren(box);
+  }
   const css = `:host{all:initial;font-family:system-ui,-apple-system,sans-serif;color:#183b36;font-size:14px;line-height:1.6}*{box-sizing:border-box}button,input,textarea{font:inherit}button{cursor:pointer;border:1px solid #d0ddd6;border-radius:8px;background:white;color:#24594c;padding:6px 10px}button:hover{background:#edf4ee}button:disabled{opacity:.5;cursor:wait}textarea,input{width:100%;background:white;border:1px solid #c5d4ca;border-radius:8px;padding:9px;color:#183b36}textarea{resize:vertical;min-height:75px}.lc-card{background:#fffef9;border:1px solid #ccdbd1;border-radius:14px;padding:16px;box-shadow:0 12px 50px #152f3429;color:#183b36;font-size:14px;line-height:1.6;max-height:80vh;overflow:auto}.lc-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:8px 0}.lc-muted{color:#637870;font-size:12px}.lc-quote{border-left:3px solid #d4a462;padding:6px 12px;margin:10px 0;white-space:pre-wrap;max-height:130px;overflow:auto}.lc-status{white-space:pre-wrap;font-size:13px}.lc-card button[data-saved="true"]{opacity:1;cursor:default}.lc-primary{background:#24594c!important;color:white!important}.lc-card .lc-head{justify-content:space-between;align-items:flex-start;margin-top:0}.lc-head strong{max-width:calc(100% - 62px);font-size:18px;line-height:1.5;overflow-wrap:anywhere}.lc-head button{flex-shrink:0;font-size:12px;border-color:transparent}.lc-card textarea{margin-top:18px}.lc-card .lc-quote{border-left:2px solid #c8d7c7;background:#f0f3eb;border-radius:0;color:#4d6659;font-size:14px;line-height:1.75}.lc-card .lc-status{padding:10px 0;font-size:14px;line-height:1.75}.lc-card{background:#fcfcf8;border-radius:12px;padding:20px}.lc-card button{min-height:34px}.lc-card button:focus-visible,.lc-card textarea:focus-visible{outline:2px solid #28564a;outline-offset:3px}.lc-label{font-size:11px;letter-spacing:.1em;color:#657a71}.lc-text{white-space:pre-wrap;user-select:text}.lc-error{color:#a44131}
 .lc-definition-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start}.lc-card .lc-definition-row .lc-word-actions{display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-top:8px}.lc-definition-row .lc-primary{font-size:12px}.lc-card [hidden]{display:none!important}.lc-card{padding:16px;background:#fcfcf8;border:1px solid #d8e1dc;border-radius:12px;font-size:14px;line-height:1.6}.lc-card .lc-head{margin:0 0 10px;align-items:center}.lc-head strong{font-size:14px;font-weight:500;color:#60766d}.lc-card button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px}.lc-card .lc-icon{width:16px;height:16px;flex-shrink:0}.lc-card .lc-primary .lc-icon{filter:brightness(0) invert(1)}.lc-word-row{margin:0 0 6px;gap:10px}.lc-word{font-size:30px;line-height:1.2;font-weight:700;overflow-wrap:anywhere}.lc-card .lc-text-button{border-color:transparent;background:transparent;padding:2px 4px;font-size:12px;color:#62796f;min-height:28px}.lc-meaning{white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px;line-height:1.55;margin-top:8px}.lc-meaning:empty{display:none}.lc-word-actions{margin:12px 0 0;justify-content:space-between}.lc-definition{font-size:19px;font-weight:600;line-height:1.5}.lc-explanation{font-size:12px;color:#647a70;line-height:1.6;margin-top:8px}.lc-word-section{padding-bottom:10px;border-bottom:1px solid #dce4de}.lc-context-section{padding:8px 0 12px;border-bottom:1px solid #dce4de}.lc-context-head{justify-content:space-between;margin:0 0 4px}.lc-card .lc-quote{margin:4px 0 8px;padding:8px 10px;border-left:3px solid #ccd9cf;border-radius:0 7px 7px 0;background:#f1f4ee;color:#39564b;font-size:14px;line-height:1.65;max-height:140px;overflow:auto;overflow-wrap:anywhere}.lc-card mark{color:#19483b;background:#dcebdd;border-radius:3px;padding:1px 2px}.lc-source-time{flex-shrink:0}.lc-source{display:flex;gap:8px;color:#718078;font-size:11px;text-decoration:none;line-height:1.5;margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lc-source:hover{text-decoration:underline}.lc-note-section{padding-top:10px}.lc-note-label{display:block;font-size:14px;font-weight:600}.lc-card textarea{display:block;margin-top:8px;min-height:70px;font-size:14px;font-weight:400;line-height:1.6}.lc-footer{display:grid;grid-template-columns:1fr 1.25fr;gap:8px;margin-top:12px}.lc-footer button{white-space:nowrap;padding:8px 6px;font-size:13px;background:transparent;border-color:#a9beb4;border-radius:7px;min-width:0}.lc-agent-hint{text-align:right;color:#728078;font-size:10px;margin-top:5px}.lc-card .lc-status{font-size:12px;line-height:1.5;padding:8px 0 0;overflow-wrap:anywhere}.lc-status:empty{display:none}.lc-card input:focus-visible,.lc-card a:focus-visible{outline:2px solid #28564a;outline-offset:2px}
 `;
@@ -364,6 +391,8 @@
     time,
     all,
     waitJob,
+    isCaption,
+    captionFailure,
     css,
     discussionCard,
     clipboard,

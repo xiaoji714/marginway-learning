@@ -202,3 +202,66 @@ test("sidebar document shares cached subtitles and seeks while the video stays p
     video.getByRole("region", { name: "语境双语字幕" }),
   ).toContainText("Agents connect ideas");
 });
+
+test.describe("uncached subtitle recovery", () => {
+  test.use({ uncached: true });
+  test("failed request is visible, copyable and retryable without playback or provider traffic", async ({
+    fixture,
+  }, testInfo) => {
+    const { context, extension, cli } = fixture;
+    const url = "https://www.youtube.com/watch?v=uncached001";
+    const resource = cli("resources.upsert", {
+      url,
+      title: "Uncached fixture",
+    });
+    cli("anchors.upsert", {
+      resourceId: resource.id,
+      quote: "Existing excerpt",
+      start: null,
+    });
+    const page = await context.newPage();
+    await page.goto(url);
+    const caption = page.getByRole("region", { name: "语境双语字幕" });
+    await caption
+      .getByRole("button", { name: "加载字幕", exact: true })
+      .click();
+    await expect(caption.getByRole("alert")).toContainText("Supadata API Key");
+    expect(
+      cli("jobs.list").items.filter((j: any) => j.type === "transcript"),
+    ).toHaveLength(1);
+    const panel = await context.newPage();
+    await panel.setViewportSize({ width: 380, height: 900 });
+    await panel.goto(`chrome-extension://${extension}/panel.html`);
+    await page.bringToFront();
+    await expect(panel.getByRole("alert")).toContainText("Supadata API Key");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+      origin: new URL(url).origin,
+    });
+    await caption.getByRole("button", { name: "复制诊断信息" }).click();
+    await expect(caption).toContainText("已复制");
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+      "阶段：获取原生字幕",
+    );
+    const before = cli("jobs.list").items.filter(
+      (j: any) => j.type === "transcript",
+    ).length;
+    await caption.getByRole("button", { name: "重试获取" }).click();
+    await expect
+      .poll(
+        () =>
+          cli("jobs.list").items.filter((j: any) => j.type === "transcript")
+            .length,
+      )
+      .toBe(before + 1);
+    await expect(caption.getByRole("alert")).toContainText("Supadata API Key");
+    await expect(page.locator("video")).toHaveJSProperty("paused", true);
+    await testInfo.attach("caption-failure", {
+      body: await caption.screenshot(),
+      contentType: "image/png",
+    });
+    await testInfo.attach("sidebar-failure", {
+      body: await panel.locator("body").screenshot(),
+      contentType: "image/png",
+    });
+  });
+});
