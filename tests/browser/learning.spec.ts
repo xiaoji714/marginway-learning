@@ -12,6 +12,27 @@ test("paused video → note → library → Agent writeback, with visual checkpo
   await expect(page.locator("#learning-companion-subtitles")).toHaveCount(1);
   await expect(page.locator("video")).toHaveJSProperty("paused", true);
   await expect(caption).toHaveScreenshot("paused-bilingual.png");
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: new URL(videoUrl).origin,
+  });
+  await caption.locator(".original").dblclick({ position: { x: 30, y: 12 } });
+  const selectedCard = page.getByRole("region", { name: "学习选区" });
+  await expect(selectedCard.locator(".lc-word")).toHaveText("Context");
+  await expect(selectedCard.locator(".lc-definition")).toHaveText("语境");
+  await expect(
+    selectedCard.getByRole("button", { name: /已收藏/ }),
+  ).toBeDisabled();
+  await expect(selectedCard).toHaveScreenshot("saved-word-card.png");
+  await selectedCard.getByRole("button", { name: "在 Agent 中讨论" }).click();
+  await expect(selectedCard).toContainText("已复制");
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied.length).toBeLessThanOrEqual(2000);
+  expect(copied).toContain(anchorId);
+  expect(copied).toContain("SKILL.md");
+  expect(copied).not.toContain('"context":');
+  await selectedCard.getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(selectedCard).toHaveCount(0);
+  await expect(page.locator("video")).toHaveJSProperty("paused", true);
   await caption.getByRole("button", { name: "记笔记", exact: true }).click();
   const card = page.getByRole("region", { name: "学习选区" });
   await expect(card).toBeVisible();
@@ -67,6 +88,7 @@ test("library categories and settings keep consistent layout at desktop and narr
     ]) {
       await page.getByRole("button", { name, exact: true }).click();
       await expect(page.locator("#breadcrumbs")).toContainText(name!);
+      await expect(page.locator("#status")).not.toHaveClass(/error/);
       await expect(page.locator("main")).toHaveScreenshot(
         `${key}-${width}.png`,
       );
