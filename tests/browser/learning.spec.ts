@@ -107,3 +107,72 @@ test("library categories and settings keep consistent layout at desktop and narr
   await expect(page.locator("#aiApiKey")).toHaveValue("");
   await expect(page).toHaveScreenshot("settings-empty.png");
 });
+
+test("library edits preserve context, conflicts preserve drafts, deletion can be restored", async ({
+  fixture,
+}) => {
+  const { context, extension, cli, anchorId, resourceId } = fixture;
+  const original = cli("notes.append", {
+    anchorId,
+    text: "Original test thought",
+    operationId: "edit-fixture",
+  });
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extension}/library.html`);
+  await page.getByRole("button", { name: "思考笔记", exact: true }).click();
+  await page.getByRole("button", { name: "编辑笔记", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("笔记内容").fill("My unsaved draft");
+  cli("notes.update", {
+    id: original.id,
+    expectedRevision: original.revision,
+    text: "External newer thought",
+    operationId: "external-edit",
+  });
+  await dialog.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(dialog).toContainText("内容已保留");
+  await expect(dialog.getByLabel("笔记内容")).toHaveValue("My unsaved draft");
+  expect(cli("records.get", { id: original.id }).text).toBe(
+    "External newer thought",
+  );
+  await dialog.getByRole("button", { name: "取消", exact: true }).click();
+  await expect(page.locator("#content")).toContainText(
+    "External newer thought",
+  );
+  await page.getByRole("button", { name: "编辑笔记", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("笔记内容").fill("Reconciled thought");
+  await dialog.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator("#content")).toContainText("Reconciled thought");
+  expect(cli("records.get", { id: original.id }).anchorId).toBe(anchorId);
+  await page.getByRole("button", { name: "删除笔记", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "移入回收站", exact: true })
+    .click();
+  await expect.poll(() => cli("notes.list").total).toBe(0);
+  await page.getByRole("button", { name: "回收站", exact: true }).click();
+  await expect(page.locator("#content")).toContainText("Reconciled thought");
+  await page
+    .locator("#content")
+    .getByRole("button", { name: "恢复", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "恢复", exact: true })
+    .click();
+  await expect.poll(() => cli("notes.list").total).toBe(1);
+  await page.getByRole("button", { name: "全部资源", exact: true }).click();
+  await page.getByRole("button", { name: "编辑资源", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("资源标题").fill("Renamed resource");
+  await dialog.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator("#content")).toContainText("Renamed resource");
+  expect(cli("records.get", { id: resourceId }).url).toBe(videoUrl);
+  await page.getByRole("button", { name: "单词簿", exact: true }).click();
+  await page.getByRole("button", { name: "编辑单词", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("单词或短语").fill("context");
+  await dialog.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator(".word-title")).toHaveText("context");
+});

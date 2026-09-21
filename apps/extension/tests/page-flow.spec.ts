@@ -273,3 +273,277 @@ test("failed automatic translations surface an error and do not loop paid reques
     "翻译暂不可用：offline",
   );
 });
+
+test("selection uses captured subtitle identity, ignores editable controls and invalid selections", async () => {
+  const f = fixture();
+  const root = await ready(f);
+  const d = f.w.document;
+  const selected = (element: any, text = "Context", collapsed = false) => {
+    const range = d.createRange();
+    range.selectNodeContents(element);
+    range.getBoundingClientRect = () => ({ left: 30, bottom: 40 });
+    return {
+      isCollapsed: collapsed,
+      toString: () => text,
+      getRangeAt: () => range,
+      removeAllRanges() {},
+    };
+  };
+  root.getSelection = () => selected(root.querySelector(".original"));
+  const callbacks: any[] = [];
+  f.w.ResizeObserver = class {
+    constructor(fn: any) {
+      callbacks.push(fn);
+    }
+    observe() {}
+    disconnect() {}
+  };
+  root
+    .querySelector(".original")
+    .dispatchEvent(
+      new f.w.MouseEvent("mouseup", { bubbles: true, composed: true }),
+    );
+  await tick();
+  await tick();
+  let popup = Array.from(d.querySelectorAll("div")).find((el: any) =>
+    el.shadowRoot?.querySelector(".lc-card"),
+  ) as any;
+  expect(popup.shadowRoot.querySelector(".lc-word").textContent).toBe(
+    "Context",
+  );
+  expect(f.calls.some((m) => m.command === "anchors.upsert")).toBe(false);
+  popup.shadowRoot
+    .querySelector("textarea")
+    .dispatchEvent(
+      new f.w.MouseEvent("mouseup", { bubbles: true, composed: true }),
+    );
+  find(popup.shadowRoot, "关闭").click();
+  callbacks[0]();
+  root.getSelection = () => ({ toString: () => "" });
+  const p = d.querySelector("p");
+  for (const value of [
+    null,
+    selected(p, "", true),
+    selected(p, "  "),
+    selected(p, "a".repeat(2001)),
+  ]) {
+    f.w.getSelection = () => value;
+    p.dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+    await tick();
+  }
+  expect(
+    Array.from(d.querySelectorAll("div")).some((el: any) =>
+      el.shadowRoot?.querySelector(".lc-card"),
+    ),
+  ).toBe(false);
+  f.w.getSelection = () => selected(p);
+  p.dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+  p.dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+  await tick();
+  await tick();
+  expect(f.calls.filter((m) => m.command === "anchors.upsert")).toHaveLength(2);
+  expect(
+    Array.from(d.querySelectorAll("div")).filter((el: any) =>
+      el.shadowRoot?.querySelector(".lc-card"),
+    ),
+  ).toHaveLength(1);
+  popup = Array.from(d.querySelectorAll("div")).find((el: any) =>
+    el.shadowRoot?.querySelector(".lc-card"),
+  ) as any;
+  find(popup.shadowRoot, "关闭").click();
+  const editable = d.createElement("div");
+  Object.defineProperty(editable, "isContentEditable", { value: true });
+  d.body.append(editable);
+  editable.dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+  await tick();
+  expect(f.calls.filter((m) => m.command === "anchors.upsert")).toHaveLength(2);
+});
+
+test("selection failure, stale anchor response and detached text are handled without opening a wrong card", async () => {
+  const f = fixture();
+  await ready(f);
+  const d = f.w.document;
+  let release: any;
+  const original = f.w.chrome.runtime.sendMessage;
+  const p = d.createElement("div");
+  p.textContent = "Fallback text";
+  d.body.append(p);
+  let range: any = {
+    commonAncestorContainer: p,
+    getBoundingClientRect: () => ({ left: 20, bottom: 20 }),
+  };
+  f.w.getSelection = () => ({
+    isCollapsed: false,
+    toString: () => "Fallback",
+    getRangeAt: () => range,
+    removeAllRanges() {},
+  });
+  f.w.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "anchors.upsert"
+      ? new Promise(
+          (resolve) =>
+            (release = () =>
+              resolve({
+                ok: true,
+                result: { id: "late", quote: "Fallback", start: null },
+              })),
+        )
+      : original(m);
+  p.dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+  await expect.poll(() => !!release).toBe(true);
+  f.w.history.pushState({}, "", "/");
+  f.poll();
+  release();
+  await tick();
+  expect(
+    Array.from(d.querySelectorAll("div")).some((el: any) =>
+      el.shadowRoot?.querySelector(".lc-card"),
+    ),
+  ).toBe(false);
+  f.w.console.warn = () => {};
+  f.setFailed(true);
+  f.w.chrome.runtime.sendMessage = original;
+  p.dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+  await tick();
+  await tick();
+  expect(
+    Array.from(d.querySelectorAll("div")).some((el: any) =>
+      el.shadowRoot?.querySelector(".lc-card"),
+    ),
+  ).toBe(false);
+  f.setFailed(false);
+  range = {
+    commonAncestorContainer: d.createTextNode("detached"),
+    getBoundingClientRect: () => ({}),
+  };
+  p.dispatchEvent(new f.w.MouseEvent("mouseup", { bubbles: true }));
+  await tick();
+  await tick();
+  expect(
+    f.calls.findLast((m) => m.command === "anchors.upsert").params.context,
+  ).toBe("Fallback");
+});
+
+test("initial stale host and pending registration cannot attach old video data after navigation", async () => {
+  const f = fixture();
+  const stale = f.w.document.createElement("div");
+  stale.id = "learning-companion-subtitles";
+  f.w.document.body.append(stale);
+  f.send({ event: "changed" });
+  let release: any;
+  const original = f.w.chrome.runtime.sendMessage;
+  f.w.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "resources.upsert"
+      ? new Promise(
+          (resolve) =>
+            (release = () =>
+              resolve({ ok: true, result: { id: "r", url: m.params.url } })),
+        )
+      : original(m);
+  f.poll();
+  expect(stale.isConnected).toBe(false);
+  await tick();
+  f.w.history.pushState({}, "", "/");
+  release();
+  await tick();
+  f.poll();
+  expect(
+    f.w.document.querySelector("#learning-companion-subtitles"),
+  ).toBeNull();
+});
+
+test("stale refresh and delayed translation success/failure never overwrite a new video", async () => {
+  for (const ok of [true, false]) {
+    const f = fixture({ missing: true });
+    let release: any;
+    const original = f.w.chrome.runtime.sendMessage;
+    f.w.chrome.runtime.sendMessage = async (m: any) =>
+      m.command === "jobs.submit"
+        ? new Promise(
+            (resolve) =>
+              (release = () =>
+                resolve(
+                  ok
+                    ? { ok: true, result: { id: "j" } }
+                    : { ok: false, error: "late" },
+                )),
+          )
+        : original(m);
+    await ready(f);
+    await expect.poll(() => !!release).toBe(true);
+    f.w.history.pushState({}, "", "/");
+    f.poll();
+    release();
+    await tick();
+    expect(
+      f.w.document.querySelector("#learning-companion-subtitles"),
+    ).toBeNull();
+  }
+  const f = fixture();
+  await ready(f);
+  let release: any;
+  const original = f.w.chrome.runtime.sendMessage;
+  f.w.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "anchors.list"
+      ? new Promise(
+          (resolve) =>
+            (release = () =>
+              resolve({ ok: true, result: { items: [], next: null } })),
+        )
+      : original(m);
+  f.send({ event: "changed" });
+  await tick();
+  f.w.history.pushState({}, "", "/");
+  f.poll();
+  release();
+  await tick();
+  expect(
+    f.w.document.querySelector("#learning-companion-subtitles"),
+  ).toBeNull();
+});
+
+test("card events are ignored and blocked playback restoration does not leak a rejection", async () => {
+  const f = fixture();
+  const root = await ready(f);
+  f.setPaused(false);
+  f.video.play = async () => {
+    throw Error("Autoplay denied");
+  };
+  find(root, "记笔记").click();
+  await tick();
+  const popup = Array.from(f.w.document.querySelectorAll("div")).find(
+    (el: any) => el.shadowRoot?.querySelector(".lc-card"),
+  ) as any;
+  const event = new f.w.MouseEvent("mouseup", { bubbles: true });
+  event.composedPath = () => [popup, f.w.document];
+  f.w.document.dispatchEvent(event);
+  expect(f.calls.some((m) => m.command === "anchors.upsert")).toBe(false);
+  find(popup.shadowRoot, "关闭").click();
+  await tick();
+  expect(popup.isConnected).toBe(false);
+  f.setFailed(true);
+  f.send({ event: "changed" });
+  await tick();
+  expect(root.querySelector(".original").textContent).toContain("Context");
+});
+
+test("a delayed translation failure for the previous caption does not replace the current caption", async () => {
+  const f = fixture({ missing: true });
+  const original = f.w.chrome.runtime.sendMessage;
+  let release: any;
+  f.w.chrome.runtime.sendMessage = (m: any) =>
+    m.command === "jobs.submit"
+      ? new Promise(
+          (resolve) =>
+            (release = () => resolve({ ok: false, error: "offline" })),
+        )
+      : original(m);
+  const root = await ready(f);
+  expect(release).toBeTruthy();
+  const reject = release;
+  f.video.currentTime = 12;
+  f.poll();
+  reject();
+  await tick();
+  expect(root.querySelector(".original").textContent).toBe("Second sentence");
+});
