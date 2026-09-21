@@ -14,6 +14,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import assert from "node:assert/strict";
 import { checkVersions } from "./version.js";
 const version = checkVersions();
+const runtimeNode = process.env.MARGINWAY_RUNTIME_NODE || process.execPath;
 const temp = mkdtempSync(join(tmpdir(), "context-release-"));
 try {
   const entries = unzipSync(
@@ -33,7 +34,7 @@ try {
   }
   const diagnosticData = join(temp, "missing-doctor-data");
   const diagnostic = spawnSync(
-    process.execPath,
+    runtimeNode,
     ["--no-warnings", join(temp, "media/runtime/learning.js"), "doctor"],
     { encoding: "utf8", env: { ...process.env, LC_DATA_DIR: diagnosticData } },
   );
@@ -44,7 +45,7 @@ try {
   );
   assert.equal(existsSync(diagnosticData), false);
   const unpackedSkill = spawnSync(
-    process.execPath,
+    runtimeNode,
     ["--no-warnings", join(temp, "media/runtime/learning.js"), "skill"],
     { encoding: "utf8" },
   );
@@ -59,7 +60,7 @@ try {
   mkdirSync(foreign);
   writeFileSync(join(foreign, "keep.txt"), "unrelated data");
   const rejected = spawnSync(
-    process.execPath,
+    runtimeNode,
     [
       join(temp, "media/runtime/install.js"),
       "--skip-registration",
@@ -79,7 +80,7 @@ try {
   );
   assert(!existsSync(join(home, ".local/share/learning-companion/runtime")));
   const installed = spawnSync(
-    process.execPath,
+    runtimeNode,
     [
       join(temp, "media/runtime/install.js"),
       "--skip-registration",
@@ -96,7 +97,7 @@ try {
   const env = { ...process.env, LC_DATA_DIR: join(temp, "data") };
   const cli = join(home, ".local/share/learning-companion/runtime/learning.js");
   const run = (...args: string[]) => {
-    const p = spawnSync(process.execPath, ["--no-warnings", cli, ...args], {
+    const p = spawnSync(runtimeNode, ["--no-warnings", cli, ...args], {
       encoding: "utf8",
       env,
     });
@@ -113,7 +114,7 @@ try {
   );
   writeFileSync(join(dir, "obsolete.js"), "old output");
   const upgraded = spawnSync(
-    process.execPath,
+    runtimeNode,
     [
       join(temp, "media/runtime/install.js"),
       "--skip-registration",
