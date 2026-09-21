@@ -243,7 +243,7 @@ test("resource detail survives database notifications and shows agent provenance
   );
   assert.match(
     w.document.getElementById("breadcrumbs").textContent,
-    /资料库全部资源资源记录/,
+    /资料库全部资源Resource/,
   );
 });
 test("deferred mouse selection preserves shadow path and does not reopen an active card", async (t) => {
@@ -832,7 +832,7 @@ test("learning heatmap uses 365 local calendar days, paginated records and click
       .getAttribute("aria-current"),
     "page",
   );
-  assert.equal(w.document.getElementById("view-title").textContent, "学习统计");
+  assert.equal(w.document.querySelector("#breadcrumbs [aria-current=page]").textContent, "学习统计");
   const cells = [...w.document.querySelectorAll(".activity-day")];
   assert.equal(cells.length, 365);
   assert.equal(new Set(cells.map((x) => x.dataset.date)).size, 365);
@@ -1068,7 +1068,7 @@ test("library edits resources, words, context meanings and notes through the sto
   await pause(20);
   assert.equal(
     w.document.querySelector("#breadcrumbs").textContent,
-    "资料库全部资源资源记录",
+    "资料库全部资源Updated source",
   );
   assert.equal(
     w.document.querySelector(".resource-actions .source-link").href,
@@ -1082,7 +1082,7 @@ test("library edits resources, words, context meanings and notes through the sto
   field("资源标题", "Detail title");
   await save();
   assert.equal(
-    w.document.querySelector("#view-description").textContent,
+    w.document.querySelector("#breadcrumbs [aria-current=page]").textContent,
     "Detail title",
   );
   click("编辑笔记");
@@ -1144,7 +1144,7 @@ test("library edits resources, words, context meanings and notes through the sto
   await pause(20);
   assert.equal(
     w.document.querySelector("#breadcrumbs").textContent,
-    "资料库搜索结果资源记录",
+    "资料库搜索结果Detail title",
   );
   click("搜索结果", w.document.querySelector("#breadcrumbs"));
   await pause(20);
@@ -1155,7 +1155,7 @@ test("library edits resources, words, context meanings and notes through the sto
   );
   click("资料库", w.document.querySelector("#breadcrumbs"));
   await pause(20);
-  assert.equal(w.document.querySelector("#view-title").textContent, "学习统计");
+  assert.equal(w.document.querySelector("#breadcrumbs [aria-current=page]").textContent, "学习统计");
   assert.equal(w.document.querySelector("#query").value, "");
 });
 
@@ -1271,7 +1271,7 @@ test("library deletion confirms scope, preserves data on cancel and restores eac
   assert.match(dialog().textContent, /全局词条与复习历史保留/);
   await confirm();
   assert.equal(run("resources.list").total, 0);
-  assert.equal(w.document.querySelector("#view-title").textContent, "全部资源");
+  assert.equal(w.document.querySelector("#breadcrumbs [aria-current=page]").textContent, "全部资源");
   assert.equal(run("notes.list").total, 0);
   await restore();
   click("单词簿");
