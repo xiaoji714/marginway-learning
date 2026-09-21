@@ -2,6 +2,7 @@
 
 ## 分层
 
+- `pr-gate` 还要求 Linux 下22.13.0、24.0.0、26.0.0的发布包安装/CLI烟测通过；固定开发版本不限制用户兼容环境。
 - `pnpm run ci` 同时检查核心与应用逐文件四项 100%，并运行安装烟测（三平台由 GitHub 执行）。
 - `pnpm run test:runtime-coverage` 检查扩展、CLI、Native 全部运行源码的四项 100%；低于目标必须失败。`test:runtime-report` 仅用于排查差距，不代表通过覆盖门禁。
 - `pnpm run test:browser` 在 Linux 隔离环境运行 Chrome for Testing；配置 `MARGINWAY_CHROME`，不要使用个人浏览器目录。端到端流程同时包含行为、数据库和视觉检查。

@@ -14,6 +14,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import assert from "node:assert/strict";
 import { checkVersions } from "./version.js";
 const version = checkVersions();
+const runtimeNode = process.env.MARGINWAY_RUNTIME_NODE || process.execPath;
 const temp = mkdtempSync(join(tmpdir(), "context-release-"));
 try {
   const entries = unzipSync(
@@ -33,7 +34,7 @@ try {
   }
   const diagnosticData = join(temp, "missing-doctor-data");
   const diagnostic = spawnSync(
-    process.execPath,
+    runtimeNode,
     ["--no-warnings", join(temp, "media/runtime/learning.js"), "doctor"],
     { encoding: "utf8", env: { ...process.env, LC_DATA_DIR: diagnosticData } },
   );
@@ -44,7 +45,7 @@ try {
   );
   assert.equal(existsSync(diagnosticData), false);
   const unpackedSkill = spawnSync(
-    process.execPath,
+    runtimeNode,
     ["--no-warnings", join(temp, "media/runtime/learning.js"), "skill"],
     { encoding: "utf8" },
   );
@@ -59,7 +60,7 @@ try {
   mkdirSync(foreign);
   writeFileSync(join(foreign, "keep.txt"), "unrelated data");
   const rejected = spawnSync(
-    process.execPath,
+    runtimeNode,
     [
       join(temp, "media/runtime/install.js"),
       "--skip-registration",
@@ -79,7 +80,7 @@ try {
   );
   assert(!existsSync(join(home, ".local/share/learning-companion/runtime")));
   const installed = spawnSync(
-    process.execPath,
+    runtimeNode,
     [
       join(temp, "media/runtime/install.js"),
       "--skip-registration",
@@ -95,17 +96,29 @@ try {
   assert.equal(installed.status, 0, installed.stderr);
   const env = { ...process.env, LC_DATA_DIR: join(temp, "data") };
   const cli = join(home, ".local/share/learning-companion/runtime/learning.js");
+  const launcher = join(home, ".local/bin/learning");
   const run = (...args: string[]) => {
-    const p = spawnSync(process.execPath, ["--no-warnings", cli, ...args], {
-      encoding: "utf8",
-      env,
-    });
+    // POSIX exercises the installed entrypoint and its bound Node path.
+    // Windows keeps the direct runtime smoke; cmd launch remains a separate check.
+    const windows = process.platform === "win32";
+    const p = spawnSync(
+      windows ? runtimeNode : launcher,
+      windows ? ["--no-warnings", cli, ...args] : args,
+      {
+        encoding: "utf8",
+        env,
+      },
+    );
     assert.equal(p.status, 0, p.stderr);
     return JSON.parse(p.stdout).result;
   };
   // Prove the installed CLI does not depend on the extracted media or source checkout.
 
   assert(run("capabilities").commands["notes.append"]);
+  assert.equal(
+    realpathSync(run("doctor").runtime.executablePath),
+    realpathSync(runtimeNode),
+  );
   const r = run(
     "resources.upsert",
     "--json",
@@ -113,7 +126,7 @@ try {
   );
   writeFileSync(join(dir, "obsolete.js"), "old output");
   const upgraded = spawnSync(
-    process.execPath,
+    runtimeNode,
     [
       join(temp, "media/runtime/install.js"),
       "--skip-registration",
