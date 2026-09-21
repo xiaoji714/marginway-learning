@@ -24,5 +24,7 @@
   "docs/installation.md": 2400,
   "docs/runtime-installation-design.md": 7200,
   "skills/references/usage.md": 2500,
-  "docs/testing.md": 2400
+  "docs/testing.md": 2400,
+  "docs/configuration.md": 1800,
+  "docs/usage.md": 2200
 }
