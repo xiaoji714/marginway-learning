@@ -176,3 +176,29 @@ test("library edits preserve context, conflicts preserve drafts, deletion can be
   await dialog.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.locator(".word-title")).toHaveText("context");
 });
+
+test("sidebar document shares cached subtitles and seeks while the video stays paused", async ({
+  fixture,
+}) => {
+  const { context, extension } = fixture;
+  const video = await context.newPage();
+  await video.goto(videoUrl);
+  await expect(
+    video.getByRole("region", { name: "语境双语字幕" }),
+  ).toContainText("语境让学习更有意义");
+  const panel = await context.newPage();
+  await panel.setViewportSize({ width: 380, height: 900 });
+  await panel.goto(`chrome-extension://${extension}/panel.html`);
+  await video.bringToFront();
+  await expect(panel.locator(".node")).toHaveCount(3);
+  await expect(panel.locator("#timeline")).toContainText(
+    "Agent 把不同资料中的想法连接起来",
+  );
+  await expect(panel.locator("main")).toHaveScreenshot("sidebar-cached.png");
+  await panel.locator(".time").nth(1).click();
+  await expect(video.locator("video")).toHaveJSProperty("currentTime", 10);
+  await expect(video.locator("video")).toHaveJSProperty("paused", true);
+  await expect(
+    video.getByRole("region", { name: "语境双语字幕" }),
+  ).toContainText("Agents connect ideas");
+});
