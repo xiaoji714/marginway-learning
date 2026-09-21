@@ -16,4 +16,6 @@ Phosphor Icons，MIT。许可见 `apps/extension/public/icons/PHOSPHOR-LICENSE`�
 
 ## 产品运行截图
 
-README 的 `docs/assets/product-video.png` 由维护者提供，用于展示扩展在 YouTube 的运行方式。画面中的视频来自 [Dwarkesh Podcast](https://www.youtube.com/watch?v=6AgOfiZOWiY)；视频画面及 YouTube 标识的权利属于各自权利人，不由本项目 MIT 许可证重新授权。
+旧静态素材页的 `docs/assets/product-video.png` 由维护者提供，用于展示扩展在 YouTube 的运行方式。画面中的视频来自 [Dwarkesh Podcast](https://www.youtube.com/watch?v=6AgOfiZOWiY)；视频画面及 YouTube 标识的权利属于各自权利人，不由本项目 MIT 许可证重新授权。
+
+README 与官网的 `product-youtube.png` 展示 Jeremy Howard 的 [A Hackers’ Guide to Language Models](https://www.youtube.com/watch?v=jkrNMKz9pWU)，视频采用 YouTube [CC BY](https://www.youtube.com/t/creative_commons) 许可。截图叠加本产品字幕、笔记界面与机器翻译，不代表原作者背书；YouTube 标识仍归其权利人。设置截图为测试环境的空白密钥界面。
