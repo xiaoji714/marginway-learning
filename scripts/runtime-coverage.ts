@@ -15,6 +15,7 @@ const { createContext } = reportLib;
 import reports from "istanbul-reports";
 const { create } = reports;
 import { instrument } from "./testing/instrument.js";
+import { processCoveragePrelude } from "./testing/process-coverage.js";
 
 const directory = resolve(".local/runtime-coverage");
 rmSync(directory, { recursive: true, force: true });
@@ -36,9 +37,7 @@ try {
         entries.push(target);
         writeFileSync(
           target,
-          `import { writeFileSync as coverageWrite } from 'node:fs';\n` +
-            `process.on('exit', () => coverageWrite(${JSON.stringify(directory)} + '/' + process.pid + '.json', JSON.stringify(globalThis.__coverage__ || {})));\n` +
-            code.replace(/^#!.*\n/, ""),
+          processCoveragePrelude(directory) + code.replace(/^#!.*\n/, ""),
         );
       }
     }
