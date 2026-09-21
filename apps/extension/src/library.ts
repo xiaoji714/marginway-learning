@@ -5,18 +5,15 @@ let view = "stats",
   detailResource: any = null,
   renderGeneration = 0,
   lastRenderKey = "";
-const views: Record<string, [string, string]> = {
-  "resources.list": ["全部资源", "从一个视频或网页，找回相关的词句与思考。"],
-  "vocabulary.list": ["单词簿", "每个词，都保留你遇见它时的原文语境。"],
-  "notes.list": ["思考笔记", "回到当时的问题，也可以带着上下文继续讨论。"],
-  review: ["今日复习", "先回想语境，再查看答案，按真实记忆程度记录。"],
-  "jobs.list": ["任务状态", "查看字幕获取与翻译的进度。"],
-  stats: ["学习统计", "查看这台电脑上积累的学习记录。"],
-  "trash.list": [
-    "回收站",
-    "删除的资料保留在本机，可随时恢复；恢复关联记录前，请先恢复所属资源或词条。",
-  ],
-  search: ["搜索结果", "同时查找资源、原文、词汇、笔记与分类。"],
+const views: Record<string, string> = {
+  "resources.list": "全部资源",
+  "vocabulary.list": "单词簿",
+  "notes.list": "思考笔记",
+  review: "今日复习",
+  "jobs.list": "任务状态",
+  stats: "学习统计",
+  "trash.list": "回收站",
+  search: "搜索结果",
 };
 const jobNames: Record<string, string> = {
   transcript: "获取视频字幕",
@@ -54,9 +51,9 @@ function breadcrumbs() {
   const list = el("ol");
   const entries: [string, (() => void) | null][] = [
     ["资料库", () => navigate("stats", true)],
-    [views[view]![0], detailResource ? () => navigate(view) : null],
+    [views[view]!, detailResource ? () => navigate(view) : null],
   ];
-  if (detailResource) entries.push(["资源记录", null]);
+  if (detailResource) entries.push([detailResource.title, null]);
   for (const [label, action] of entries) {
     const item = el("li");
     const node = action ? button(label, action) : el("span", label);
@@ -65,10 +62,6 @@ function breadcrumbs() {
     list.append(item);
   }
   nav.replaceChildren(list);
-}
-function heading(title: any, description: any) {
-  if ($("view-title")) $("view-title").textContent = title;
-  if ($("view-description")) $("view-description").textContent = description;
 }
 function link(r: any, a?: any) {
   const u = new URL(r.url);
@@ -516,8 +509,9 @@ async function render() {
     b.setAttribute("aria-current", b.dataset.view === view ? "page" : "false");
   $("status").className = "status";
   breadcrumbs();
+  const help = $("view-help");
+  if (help) help.hidden = Boolean(detailResource) || view !== "trash.list";
   if (detailResource) return resourceDetails(detailResource, gen);
-  heading(...(views[view] || views.search!));
   if (view === "stats") {
     const [s, events] = await Promise.all([api("stats"), all("activity.list")]);
     if (gen !== renderGeneration) return;
@@ -544,7 +538,7 @@ async function render() {
         "muted stats-footnote",
       ),
     );
-    $("status").textContent = "本机累计";
+    $("status").textContent = "";
     return;
   }
   const params = { query: $<HTMLInputElement>("query").value };
@@ -838,7 +832,7 @@ async function resourceDetails(r: any, gen: any) {
   }
   r = latest;
   detailResource = latest;
-  heading("资源记录", r.title);
+  breadcrumbs();
   const fragment = document.createDocumentFragment();
   const actions = el("div", null, "actions resource-actions");
   actions.append(

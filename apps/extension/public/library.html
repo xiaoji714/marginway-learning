@@ -48,12 +48,8 @@
         ><button data-view="trash.list">回收站</button>
       </nav>
       <section class="workspace">
-        <nav id="breadcrumbs" aria-label="面包屑导航"></nav>
-        <div class="view-heading">
-          <div>
-            <h2 id="view-title">学习统计</h2>
-            <p id="view-description" class="muted"></p>
-          </div>
+        <div class="workspace-toolbar">
+          <nav id="breadcrumbs" aria-label="面包屑导航"></nav>
           <div
             id="status"
             class="status"
@@ -61,6 +57,7 @@
             aria-live="polite"
           ></div>
         </div>
+        <p id="view-help" class="muted" hidden>删除的资料保留在本机，可随时恢复；恢复关联记录前，请先恢复所属资源或词条。</p>
         <section id="content" aria-label="学习记录"></section>
       </section>
     </main>
