@@ -12,15 +12,36 @@ export function createResources(
         id = "r_" + hash(url),
         prev = maybe(id);
       if (prev) active(prev);
-      result =
-        (prev?.archived
-          ? save("resource", { ...prev, archived: false }, actor, id)
-          : prev) ||
-        save(
+      const title = str(p.title, 500).trim();
+      if (prev) {
+        // Old resources have no explicit edit marker. Preserve revised legacy titles conservatively.
+        const canFill =
+          prev.titleEdited === false ||
+          (prev.titleEdited == null && prev.revision === 1);
+        const fill =
+          canFill &&
+          placeholderTitle(prev.title, url) &&
+          !placeholderTitle(title, url);
+        result =
+          prev.archived || fill
+            ? save(
+                "resource",
+                {
+                  ...prev,
+                  archived: false,
+                  ...(fill ? { title, titleEdited: false } : {}),
+                },
+                actor,
+                id,
+              )
+            : prev;
+      } else {
+        result = save(
           "resource",
           {
             url,
-            title: str(p.title, 500) || url,
+            title: placeholderTitle(title, url) ? url : title,
+            titleEdited: false,
             tags: Array.isArray(p.tags)
               ? p.tags.map((x: unknown) => str(x, 60)).slice(0, 20)
               : [],
@@ -31,6 +52,7 @@ export function createResources(
           actor,
           id,
         );
+      }
 
       return result;
     },
@@ -57,7 +79,11 @@ export function createResources(
         "resource",
         {
           ...r,
-          title: str(p.title, 500) || r.title,
+          title: str(p.title, 500).trim() || r.title,
+          titleEdited: str(p.title, 500).trim()
+            ? true
+            : (r.titleEdited ??
+              (r.revision !== 1 || !placeholderTitle(r.title, r.url))),
           tags: Array.isArray(p.tags)
             ? p.tags.map((x: unknown) => str(x, 60)).slice(0, 20)
             : r.tags,
@@ -111,4 +137,16 @@ export function createResources(
       return result;
     },
   };
+}
+
+function placeholderTitle(value: unknown, url: string) {
+  const title = str(value, 500).trim();
+  if (!title) return true;
+  const strip = (text: string) =>
+    text.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+  if (strip(title) === strip(url)) return true;
+  return (
+    url.startsWith("https://www.youtube.com/watch?") &&
+    /^(?:\(\d+\)\s*)?YouTube$/i.test(title)
+  );
 }
