@@ -64,13 +64,25 @@ async function handleFetchTranscript(videoId: string) {
       lang: "en",
       mode: "native",
     }).toString();
+    // One deadline bounds the complete request + polling sequence. No paid automatic retry.
+    const signal = AbortSignal.timeout(90000);
     const request = async (u: string) => {
       const r = await fetch(u, {
         headers: { "x-api-key": settings.supadataApiKey },
-        signal: AbortSignal.timeout(45000),
+        signal,
       });
       if (r.status === 206) throw new Error("该视频没有可用的原生字幕");
-      return jsonResponse(r);
+      if (r.status === 401 || r.status === 403)
+        throw new Error("Supadata 授权失败，请在设置中检查 API Key。");
+      if (r.status === 402 || r.status === 429)
+        throw new Error(
+          "Supadata 额度不足或请求受限，请在服务控制台检查后重试。",
+        );
+      if (!r.ok)
+        throw new Error(
+          `Supadata 获取失败（HTTP ${r.status}），请稍后重试；不代表视频没有字幕。`,
+        );
+      return r.json();
     };
     let data = await request(url.href);
     if (data.jobId) {
@@ -80,7 +92,10 @@ async function handleFetchTranscript(videoId: string) {
         data = await request(
           `https://api.supadata.ai/v1/transcript/${encodeURIComponent(jobId)}`,
         );
-        if (data.status === "failed") throw new Error("字幕任务失败");
+        if (data.status === "failed")
+          throw new Error(
+            "Supadata 字幕任务失败，请稍后重试；不代表视频没有字幕。",
+          );
         if (data.status === "completed" || Array.isArray(data.content)) break;
       }
     }
@@ -100,7 +115,13 @@ async function handleFetchTranscript(videoId: string) {
     if (!transcript.length) throw new Error("该视频没有可用的原生字幕");
     return { success: true, transcript };
   } catch (e) {
-    return { success: false, error: e.message, message: e.message };
+    const message =
+      e.name === "TimeoutError" || e.name === "AbortError"
+        ? "Supadata 响应超时（90 秒），请稍后重试；不代表视频没有字幕。"
+        : e.name === "TypeError"
+          ? "无法连接 Supadata，请检查网络后重试。"
+          : e.message;
+    return { success: false, error: message, message };
   }
 }
 async function handleTranslateContent(

@@ -213,3 +213,40 @@ test("settings normalize missing and invalid data without accepting arbitrary en
     expect(config.aiBaseUrl).toBe("https://api.deepseek.com");
   }
 });
+
+test("subtitle failures distinguish provider HTTP, network and deadline without leaking response bodies", async () => {
+  for (const [status, expected] of [
+    [401, "授权失败"],
+    [403, "授权失败"],
+    [402, "额度"],
+    [429, "受限"],
+    [500, "HTTP 500"],
+  ] as const) {
+    const { ctx, calls } = fixture(() =>
+      response({ secret: "must-not-leak" }, status),
+    );
+    const r = await ctx.handleFetchTranscript("abcdefghijk");
+    expect(r.message).toContain(expected);
+    expect(r.message).not.toContain("must-not-leak");
+    expect(calls).toHaveLength(1);
+  }
+  for (const [name, expected] of [
+    ["TimeoutError", "90 秒"],
+    ["AbortError", "90 秒"],
+    ["TypeError", "检查网络"],
+  ]) {
+    const { ctx } = fixture(() => {
+      throw Object.assign(new Error("test-subtitle"), { name });
+    });
+    const r = await ctx.handleFetchTranscript("abcdefghijk");
+    expect(r.message).toContain(expected);
+    expect(r.message).not.toContain("test-subtitle");
+  }
+});
+
+test("AI HTTP errors remain explicit", async () => {
+  const { ctx } = fixture(() => response({}, 503));
+  await expect(ctx.requestAiCompletion({ messages: [] })).rejects.toThrow(
+    "503",
+  );
+});

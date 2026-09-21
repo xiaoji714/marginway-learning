@@ -76,7 +76,11 @@ function fixture({ empty = false, missing = false } = {}) {
         if (m.command?.endsWith(".list")) {
           const items =
             m.command === "anchors.list"
-              ? anchors
+              ? anchors.map((a: any) => ({
+                  origin: "import",
+                  createdBy: { id: "supadata" },
+                  ...a,
+                }))
               : m.command === "translations.list"
                 ? translations
                 : [];
@@ -244,7 +248,7 @@ test("manual transcript load uses cache and reports failure without starting pla
   f.setFailed(true);
   find(root, "加载字幕").click();
   await tick();
-  expect(root.querySelector(".body").textContent).toBe("offline");
+  expect(root.querySelector(".body").textContent).toContain("offline");
   expect(f.plays()).toBe(0);
 });
 
@@ -547,3 +551,133 @@ test("a delayed translation failure for the previous caption does not replace th
   await tick();
   expect(root.querySelector(".original").textContent).toBe("Second sentence");
 });
+
+test("subtitle failure offers retry, excludes UI selection and never treats excerpts as cached subtitles", async () => {
+  const f = fixture({ empty: true });
+  f.setAnchors([
+    { id: "excerpt", start: null, quote: "signal timed out", origin: "human" },
+  ]);
+  const root = await ready(f);
+  const original = f.w.chrome.runtime.sendMessage;
+  let release: any;
+  f.w.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "jobs.get"
+      ? new Promise((resolve) => {
+          release = () =>
+            resolve({
+              ok: true,
+              result: { status: "error", error: "Supadata 响应超时" },
+            });
+        })
+      : original(m);
+  find(root, "加载字幕").click();
+  find(root, "加载字幕").click();
+  await tick();
+  expect(f.calls.filter((m) => m.command === "jobs.submit")).toHaveLength(1);
+  release();
+  await tick();
+  expect(root.querySelector('[role="alert"]').textContent).toContain(
+    "响应超时",
+  );
+  const event = new f.w.MouseEvent("mouseup", { bubbles: true });
+  event.composedPath = () => [
+    root.querySelector("p"),
+    f.w.document.querySelector("#learning-companion-subtitles"),
+    f.w.document,
+  ];
+  f.w.document.dispatchEvent(event);
+  expect(f.calls.some((m) => m.command === "anchors.upsert")).toBe(false);
+  find(root, "重试获取").click();
+  await tick();
+  expect(f.calls.filter((m) => m.command === "jobs.submit")).toHaveLength(2);
+  f.w.history.pushState({}, "", "/watch?v=nextvideo11");
+  f.poll();
+  release();
+  await tick();
+  expect(
+    f.w.document.querySelector("#learning-companion-subtitles").shadowRoot
+      .textContent,
+  ).not.toContain("响应超时");
+});
+
+test("page mirrors queued, running and failed transcript jobs started by another surface", async () => {
+  const f = fixture({ empty: true });
+  const original = f.w.chrome.runtime.sendMessage;
+  let state = "queued";
+  f.w.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "jobs.list"
+      ? {
+          ok: true,
+          result: {
+            items: [
+              { type: "lookup" },
+              {
+                type: "transcript",
+                status: state,
+                error: state === "error" ? "HTTP 500" : null,
+              },
+            ],
+            next: null,
+          },
+        }
+      : original(m);
+  const root = await ready(f);
+  expect(root.textContent).toContain("正在获取字幕");
+  for (const status of ["running", "error", "cancelled", "done"]) {
+    state = status;
+    f.send({ event: "changed" });
+    await tick();
+    if (status === "error") expect(root.textContent).toContain("HTTP 500");
+    if (status === "cancelled")
+      expect(root.textContent).toContain("字幕任务已取消");
+  }
+  let release: any;
+  f.w.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "jobs.list"
+      ? new Promise((resolve) => {
+          release = () =>
+            resolve({ ok: true, result: { items: [], next: null } });
+        })
+      : original(m);
+  f.send({ event: "changed" });
+  await tick();
+  f.w.history.pushState({}, "", "/");
+  f.poll();
+  release();
+  await tick();
+  expect(
+    f.w.document.querySelector("#learning-companion-subtitles"),
+  ).toBeNull();
+});
+
+test.each(["anchors.list", "jobs.get"])(
+  "navigation discards stale transcript %s completion",
+  async (phase) => {
+    const f = fixture({ empty: true });
+    const root = await ready(f);
+    const original = f.w.chrome.runtime.sendMessage;
+    let release: any;
+    f.w.chrome.runtime.sendMessage = async (m: any) =>
+      m.command === phase
+        ? new Promise((resolve) => {
+            release = () =>
+              resolve({
+                ok: true,
+                result:
+                  phase === "jobs.get"
+                    ? { status: "done" }
+                    : { items: [], next: null },
+              });
+          })
+        : original(m);
+    find(root, "加载字幕").click();
+    await tick();
+    f.w.history.pushState({}, "", "/");
+    f.poll();
+    release();
+    await tick();
+    expect(
+      f.w.document.querySelector("#learning-companion-subtitles"),
+    ).toBeNull();
+  },
+);

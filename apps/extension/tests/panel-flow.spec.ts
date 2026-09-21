@@ -71,7 +71,11 @@ function fixture({
         if (m.command?.endsWith(".list")) {
           const items =
             m.command === "anchors.list"
-              ? anchors
+              ? anchors.map((a: any) => ({
+                  origin: "import",
+                  createdBy: { id: "supadata" },
+                  ...a,
+                }))
               : m.command === "notes.list"
                 ? notes
                 : m.command === "translations.list"
@@ -302,6 +306,7 @@ test("stale refresh and playback responses cannot restore an earlier resource", 
 
 test("web excerpts, no selection, missing progress and denied page messaging are handled", async () => {
   const f = fixture({
+    url: "https://example.com/",
     anchors: [
       { id: "a", start: null, quote: "Web quote" },
       { id: "b", start: 10, quote: "Second quote" },
@@ -377,4 +382,121 @@ test("untimed excerpt ordering and paused current-node transitions do not force 
   await f.poll();
   expect(f.scrolls()).toBe(scrolled);
   expect(f.w.document.querySelector(".node.active").dataset.id).toBe("d");
+});
+
+test("human excerpts never count as subtitle cache and provider failures survive refresh until retry", async () => {
+  const f = fixture({
+    anchors: [{ id: "excerpt", start: 12, quote: "excerpt", origin: "human" }],
+  });
+  const original = f.chrome.runtime.sendMessage;
+  let failed = true;
+  f.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "jobs.get"
+      ? {
+          ok: true,
+          result: {
+            status: failed ? "error" : "done",
+            error: "Supadata 获取失败（HTTP 500）",
+          },
+        }
+      : original(m);
+  await tick();
+  await tick();
+  const d = f.w.document;
+  expect(d.querySelector("#status").textContent).toContain("HTTP 500");
+  f.changed();
+  await tick();
+  await tick();
+  expect(d.querySelector("#status").textContent).toContain("HTTP 500");
+  expect(d.querySelector("#status").textContent).not.toContain("全文翻译完成");
+  let copied = "";
+  Object.defineProperty(f.w.navigator, "clipboard", {
+    value: {
+      writeText: async (s: string) => {
+        copied = s;
+      },
+    },
+  });
+  const buttons = () =>
+    Array.from(d.querySelectorAll("#status button")) as HTMLButtonElement[];
+  buttons()
+    .find((b) => b.textContent === "复制诊断信息")!
+    .click();
+  await tick();
+  expect(copied).toContain("阶段：获取原生字幕");
+  expect(copied).toContain("HTTP 500");
+  failed = false;
+  buttons()
+    .find((b) => b.textContent === "重试获取")!
+    .click();
+  await tick();
+  await tick();
+  expect(
+    f.messages.filter(
+      (m) => m.command === "jobs.submit" && m.params.type === "transcript",
+    ),
+  ).toHaveLength(2);
+});
+
+test("late transcript rejection cannot overwrite another tab", async () => {
+  const f = fixture({ anchors: [] });
+  const original = f.chrome.runtime.sendMessage;
+  let release: any;
+  f.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "jobs.get"
+      ? new Promise((resolve) => {
+          release = () =>
+            resolve({ ok: true, result: { status: "error", error: "stale" } });
+        })
+      : original(m);
+  await tick();
+  await tick();
+  f.setActive({ id: 2, url: "https://www.youtube.com/" });
+  await f.poll();
+  release();
+  await tick();
+  expect(f.w.document.querySelector("#status").textContent).not.toContain(
+    "stale",
+  );
+});
+
+test("web excerpts sort missing timestamps and playback before the first caption is safe", async () => {
+  const f = fixture({
+    url: "https://example.com",
+    anchors: [
+      { id: "a", start: 0 },
+      { id: "b", start: null },
+    ],
+  });
+  await tick();
+  await tick();
+  const v = fixture();
+  await tick();
+  await tick();
+  v.chrome.tabs.sendMessage = async () => ({ seconds: -1 });
+  await v.poll();
+});
+
+test("successful retry from the video clears a previous sidebar error", async () => {
+  const f = fixture({ anchors: [] });
+  const original = f.chrome.runtime.sendMessage;
+  f.chrome.runtime.sendMessage = async (m: any) =>
+    m.command === "jobs.get"
+      ? { ok: true, result: { status: "error", error: "HTTP 500" } }
+      : original(m);
+  await tick();
+  await tick();
+  expect(f.w.document.querySelector("#status").textContent).toContain(
+    "HTTP 500",
+  );
+  f.setAnchors([{ id: "a", start: 0, quote: "Caption" }]);
+  f.changed();
+  await tick();
+  await tick();
+  expect(f.w.document.querySelector("#status").textContent).toContain(
+    "全文翻译完成",
+  );
+  expect(f.w.document.querySelector("#status").className).not.toContain(
+    "error",
+  );
 });

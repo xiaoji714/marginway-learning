@@ -138,13 +138,32 @@
       all("translations.list", { resourceId: id }),
     ]);
     if (seq !== refreshSequence || id !== resource?.id) return;
-    anchors = a
-      .filter((x) => x.start !== null)
-      .sort((a, b) => a.start - b.start);
+    anchors = a.filter(LC.isCaption).sort((a, b) => a.start - b.start);
     translations = new Map(t.map((x) => [x.anchorId, x.text]));
+    if (!anchors.length) {
+      const jobs = await all("jobs.list", { resourceId: id });
+      if (seq !== refreshSequence || id !== resource?.id) return;
+      const job = jobs.find((j) => j.type === "transcript");
+      makeRoot();
+      const body = root.querySelector(".body");
+      if (job?.status === "error" || job?.status === "cancelled") {
+        LC.captionFailure(
+          body,
+          job.error || "字幕任务已取消",
+          loadTranscript,
+          resource,
+        );
+      } else if (job?.status === "queued" || job?.status === "running") {
+        body.textContent = "正在获取字幕…（最多 90 秒，排队时间另计）";
+      }
+    }
     renderCurrent();
   }
+  let captionLoading = false;
   async function loadTranscript() {
+    if (captionLoading) return;
+    captionLoading = true;
+    const gen = loadGeneration;
     makeRoot();
     const status = root.querySelector(".body");
     if (!anchors.length) {
@@ -153,20 +172,23 @@
     }
     try {
       await ensureResource();
-      const existing = await api("anchors.list", {
-        resourceId: resource.id,
-        limit: 1,
-      });
-      if (!existing.total) {
+      const existing = await all("anchors.list", { resourceId: resource.id });
+      if (gen !== loadGeneration) return;
+      if (!existing.some(LC.isCaption)) {
         const j = await api("jobs.submit", {
           type: "transcript",
           resourceId: resource.id,
         });
         await LC.waitJob(j.id);
       }
-      await refreshData();
+      if (gen === loadGeneration) await refreshData();
     } catch (e) {
-      status.textContent = e.message;
+      if (gen === loadGeneration)
+        LC.captionFailure(status, e.message, loadTranscript, {
+          url: pageResourceUrl(),
+        });
+    } finally {
+      if (gen === loadGeneration) captionLoading = false;
     }
   }
   // Keep one caption DOM: job notifications must not reset text selection or flash placeholders.
@@ -345,6 +367,10 @@
     // Decide while the card is still attached: click may dispose it before the timer runs.
     if (
       (activeCard && path.includes(activeCard)) ||
+      (path.includes(host) &&
+        !path.some(
+          (n) => n instanceof HTMLElement && n.matches(".original,.translated"),
+        )) ||
       path.some(
         (n) =>
           n instanceof HTMLElement &&
@@ -403,6 +429,7 @@
     if (location.href !== currentUrl) {
       currentUrl = location.href;
       loadGeneration++;
+      captionLoading = false;
       refreshSequence++;
       selectionSequence++;
       document.documentElement.removeAttribute("data-lc-captions");

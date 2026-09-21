@@ -247,3 +247,20 @@ test("disposed card ignores pending lookup submission, rejection and already que
     expect(card.textContent).not.toContain("late failure");
   }
 });
+
+test("caption provenance and clipboard denial remain actionable", (t) => {
+  const { w } = fixture(t, () => ({}));
+  expect(w.LC.isCaption({ origin: "import" })).toBe(false);
+  expect(
+    w.LC.isCaption({
+      origin: "import",
+      createdBy: { id: "supadata" },
+      start: null,
+    }),
+  ).toBe(false);
+  w.LC.captionFailure(w.document.body, "HTTP 500", () => {}, {
+    url: "https://example.com/",
+  });
+  button(w.document.body, "复制诊断").click();
+  return expect.poll(() => w.document.body.textContent).toContain("复制失败");
+});

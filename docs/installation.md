@@ -39,7 +39,7 @@ node runtime/install.js --extension-id <扩展ID> --extension-dir "<Chrome加载
 ## 配置与第一条记录
 
 1. 按[服务配置](configuration.md)填写 Supadata、DeepSeek API Key 并保存。
-2. 重新加载扩展并刷新已有网页。点击 Chrome 工具栏扩展按钮打开侧栏。
+2. 点击 Chrome 工具栏扩展按钮打开侧栏；首次安装可直接验证。已有网页未出现功能时才刷新网页。
 3. 打开有原生字幕的 YouTube 视频查看双语字幕，或在网页划词、记笔记。
 4. 打开资料库，确认记录可见，并尝试回到原文。用安装器输出的 CLI 完整路径运行 `capabilities`、`status`，确认访问同一本机资料库。
 
@@ -47,7 +47,7 @@ node runtime/install.js --extension-id <扩展ID> --extension-dir "<Chrome加载
 
 ## 升级与排错
 
-升级先导出学习备份，用新的完整包重复第 4 步安装命令，保持目录与 ID 一致，再重新加载扩展。安装器会备份旧扩展文件；不会删除 SQLite。切换 Chrome 加载目录可能改变 ID，必须用新 ID 重装桥接；卸载扩展会清除该扩展的密钥配置，迁移前自行保留密钥。
+升级先导出学习备份，用新的完整包重复第 4 步安装命令，保持目录与 ID 一致，再重新加载扩展：在 `chrome://extensions` 开启开发者模式，点击 Marginway 卡片上的圆形箭头图标。安装器会备份旧扩展文件；不会删除 SQLite。切换 Chrome 加载目录可能改变 ID，必须用新 ID 重装桥接；卸载扩展会清除该扩展的密钥配置，迁移前自行保留密钥。
 
 无法连接时，核对 Node 仍存在、Chrome ID 与安装参数一致，然后用当前包重新运行安装器并重载扩展。请勿通过删除资料库解决连接问题。
 
