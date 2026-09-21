@@ -77,15 +77,23 @@ try {
         const row = db
           .prepare("SELECT value FROM meta WHERE key='bridge'")
           .get();
-        if (row) {
-          const heartbeat = JSON.parse(String(row.value));
-          if (typeof heartbeat?.at === "string") lastHeartbeat = heartbeat.at;
-        }
         checks.push({
           id: "database",
           status: "pass",
           code: "DATABASE_READABLE",
         });
+        if (row) {
+          try {
+            const heartbeat = JSON.parse(String(row.value));
+            if (typeof heartbeat?.at === "string") lastHeartbeat = heartbeat.at;
+          } catch {
+            checks.push({
+              id: "heartbeat",
+              status: "fail",
+              code: "HEARTBEAT_METADATA_INVALID",
+            });
+          }
+        }
       } catch {
         checks.push({
           id: "database",
