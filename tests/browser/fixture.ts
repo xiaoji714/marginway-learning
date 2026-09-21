@@ -101,12 +101,12 @@ export const test = base.extend<{
       { mode: 0o700 },
     );
     const config = join(directory, "config");
-    for (const product of [
-      "google-chrome",
-      "google-chrome-for-testing",
-      "chromium",
+    for (const hosts of [
+      ...["google-chrome", "google-chrome-for-testing", "chromium"].map(
+        (product) => join(config, product, "NativeMessagingHosts"),
+      ),
+      join(directory, "profile", "NativeMessagingHosts"),
     ]) {
-      const hosts = join(config, product, "NativeMessagingHosts");
       mkdirSync(hosts, { recursive: true });
       writeFileSync(
         join(hosts, "com.learning_companion.host.json"),
@@ -184,6 +184,13 @@ export const test = base.extend<{
         }
         await route.continue();
       });
+      const worker =
+        context.serviceWorkers()[0] ||
+        (await context.waitForEvent("serviceworker"));
+      expect(new URL(worker.url()).host).toBe(extension);
+      await expect
+        .poll(() => cli("status").bridge?.at, { timeout: 15000 })
+        .toBeTruthy();
       await testInfo.attach("browser", {
         body: context.browser()!.version(),
         contentType: "text/plain",
