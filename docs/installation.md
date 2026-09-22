@@ -6,11 +6,11 @@
 
 ## 准备与构建
 
-从 [Releases](https://github.com/xiaoji714/marginway-learning/releases/latest) 下载同一版本的 ZIP 与 `.sha256`，不要选择 GitHub 自动生成的 Source code。私有仓库需授权。核对 SHA-256（macOS：`shasum -a 256`；Linux：`sha256sum`；Windows：`Get-FileHash`），不一致则停止。发布包通过 Node 检查后跳到下一节。
+从 [Releases](https://github.com/xiaoji714/marginway-learning/releases/latest) 下载同一版本的 ZIP 与 `.sha256`，不要选择 GitHub 自动生成的 Source code。公开仓库无需申请访问权限。核对 SHA-256（macOS：`shasum -a 256`；Linux：`sha256sum`；Windows：`Get-FileHash`），不一致则停止。发布包通过 Node 检查后跳到下一节。
 
 **运行构建包**：Node **22.13.0+**，并通过下方 SQLite 检查。优先复用已有受维护的 LTS，不因小版本不同而重装。
 
-**源码构建/测试**：另需 Git、pnpm **11.22.0**；Node 按根 package.json 的 engines。`.node-version` 是开发/CI 的固定基线，不是用户唯一可用版本。仓库需授权。
+**源码构建/测试**：另需 Git、pnpm **11.22.0**；Node 按根 package.json 的 engines。`.node-version` 是开发/CI 的固定基线，不是用户唯一可用版本。
 
 仅需开发或无可用发布包时，在选定的源码父目录执行：
 

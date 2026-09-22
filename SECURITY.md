@@ -8,8 +8,6 @@ Native Messaging 由安装时的扩展 ID allowlist 与运行时 origin 双重�
 
 ## 报告漏洞
 
-仓库公开并启用 GitHub Private vulnerability reporting 后，请通过 [Report a vulnerability](https://github.com/xiaoji714/marginway-learning/security/advisories/new) 私密提交复现步骤、影响版本与脱敏证据。
+请通过 GitHub 的 [Report a vulnerability](https://github.com/xiaoji714/marginway-learning/security/advisories/new) 私密提交复现步骤、影响版本与脱敏证据。
 
-当前仓库私有，该入口尚不可用。入口不可用时，只在 [Issue](https://github.com/xiaoji714/marginway-learning/issues/new) 请求维护者提供私密联系渠道，不填写漏洞细节、密钥或个人学习记录；等待私密渠道确认后再传递材料。不承诺固定响应时限。
-
-公开切换时维护者须启用该功能并验证入口可用，再更新本说明；不得把链接存在当作功能已开启。
+若入口暂不可用，只在 [Issue](https://github.com/xiaoji714/marginway-learning/issues/new) 请求维护者提供私密联系渠道，不填写漏洞细节、密钥或个人学习记录；确认私密渠道后再传递材料。不承诺固定响应时限。
