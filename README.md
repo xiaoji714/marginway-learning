@@ -46,7 +46,7 @@
 
 > 请读取 https://github.com/xiaoji714/marginway-learning/blob/main/skills/SKILL.md ，按 Skill 帮我安装、配置并验证 Marginway；已有安装请沿用，需要我操作时逐步引导。
 
-桌面 Chrome 早期版；从 [Releases](https://github.com/xiaoji714/marginway-learning/releases/latest) 下载完整安装 ZIP，交给 Agent 按[安装指南](docs/installation.md)校验、解压和配置。仓库需授权，无商店入口，手机 Chrome 暂不支持。
+桌面 Chrome 早期版；从 [Releases](https://github.com/xiaoji714/marginway-learning/releases/latest) 下载完整安装 ZIP，交给 Agent 按[安装指南](docs/installation.md)校验、解压和配置。开源免费，第三方 API 服务另行计费；无商店入口，手机 Chrome 暂不支持。
 
 ### 02 / 配置
 
