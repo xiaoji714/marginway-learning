@@ -41,11 +41,11 @@ GitHub-hosted Linux/macOS/Windows 执行隔离安装烟测。Windows 烟测跳�
 
 README 产品演示图统一 `width="960"`，配置指南设置图为600宽；高度按内容确定，窄屏等比缩小。合成图使用浅色主题、100% 缩放：`/card` 视口1120×740；`/library.html` 进入「全部资源 → 查看资源记录」，视口1120×840。PNG 核对文件签名，不只改扩展名；检查文字、主要操作完整可见。
 
-整体推广页为 [静态 HTML](product/index.html)，直接打开即可，无 JS、构建或运行时依赖；相对路径引用独立 `showcase.css` 与原始 `assets/product-video.png`。复用 `.mw-showcase` 标记与 CSS 时保持图片路径有效；页面背景是文档级样式，嵌入现有前端时由宿主决定。
+整体推广页为 [静态 HTML](product/index.html)，直接打开即可，无 JS、构建或运行时依赖；相对路径引用独立 `showcase.css` 与原始 `assets/product-youtube.png`。复用 `.mw-showcase` 标记与 CSS 时保持图片路径有效；页面背景是文档级样式，嵌入现有前端时由宿主决定。
 
-旧推广图从该页以1120×940视口、100%缩放截图，存 `assets/product-overview.png`。页面修改后更新图片；检查无溢出、来源可访问，不拉伸原图或增加大段留白。
+静态推广页直接复用已署名的视频图，不保留另含旧素材的整页截图。检查无溢出、来源可访问，不拉伸原图或增加大段留白。
 
-README 的 `product-youtube.png` 与官网复用同一运行截图，来源见[许可说明](../THIRD_PARTY_NOTICES.md)；旧 `product-video.png` 仅供静态素材页。`settings-empty.png` 取自空白密钥的浏览器测试基线。卡片/资料库为合成资料；截图不替代扩展验收。
+README 的 `product-youtube.png` 与官网复用同一运行截图，来源见[许可说明](../THIRD_PARTY_NOTICES.md)，静态素材页也使用该图。`settings-empty.png` 取自空白密钥的浏览器测试基线。卡片/资料库为合成资料；截图不替代扩展验收。
 
 ## 决策与协作
 
