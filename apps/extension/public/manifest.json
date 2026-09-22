@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Marginway · 语境",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "minimum_chrome_version": "116",
   "description": "从内容出发，让思考延续。",
   "permissions": [
