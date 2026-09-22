@@ -6,4 +6,10 @@ Native Messaging 由安装时的扩展 ID allowlist 与运行时 origin 双重�
 
 网页、字幕和导入 Prompt 均视为引用数据，不作为系统指令执行。文本用 DOM textContent 输出。外部服务错误不得回显密钥。
 
-请通过托管平台的私密漏洞报告渠道联系维护者；若尚未启用该渠道，请勿在公开 Issue 附带密钥或个人学习记录。此仓库尚未预设维护者邮箱。
+## 报告漏洞
+
+仓库公开并启用 GitHub Private vulnerability reporting 后，请通过 [Report a vulnerability](https://github.com/xiaoji714/marginway-learning/security/advisories/new) 私密提交复现步骤、影响版本与脱敏证据。
+
+当前仓库私有，该入口尚不可用。入口不可用时，只在 [Issue](https://github.com/xiaoji714/marginway-learning/issues/new) 请求维护者提供私密联系渠道，不填写漏洞细节、密钥或个人学习记录；等待私密渠道确认后再传递材料。不承诺固定响应时限。
+
+公开切换时维护者须启用该功能并验证入口可用，再更新本说明；不得把链接存在当作功能已开启。
